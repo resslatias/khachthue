@@ -1,0 +1,135 @@
+{
+  "project_info": {
+    "project_number": "787921911781",
+    "firebase_url": "https://btl-android-menu-default-rtdb.firebaseio.com",
+    "project_id": "btl-android-menu",
+    "storage_bucket": "btl-android-menu.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:787921911781:android:f8c9b0ffe6468bb4de790c",
+        "android_client_info": {
+          "package_name": "com.example.btl_android_menu"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "787921911781-7gduo470kogqaqmv4ec8oldru59u3vgi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.btl_android_menu",
+            "certificate_hash": "171334e76865673713e780130c740f4e807142ef"
+          }
+        },
+        {
+          "client_id": "787921911781-r1pg7shg7ohv8qbo64akshk06s0qqdjo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.btl_android_menu",
+            "certificate_hash": "3270f031681b62c86b17159eb4a359b2a92c1794"
+          }
+        },
+        {
+          "client_id": "787921911781-a8i12hi1rfo8nmltmo90smmffvaanusk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWwKMrOjy0ekFBJ5yNDtLTWfuBiskig04"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "787921911781-a8i12hi1rfo8nmltmo90smmffvaanusk.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "787921911781-55c4rs8cgae2oq10777jvpmcq6psiemg.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.khoaluan"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:787921911781:android:d63b59b43e6fead5de790c",
+        "android_client_info": {
+          "package_name": "com.example.khachthue"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "787921911781-a8i12hi1rfo8nmltmo90smmffvaanusk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWwKMrOjy0ekFBJ5yNDtLTWfuBiskig04"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "787921911781-a8i12hi1rfo8nmltmo90smmffvaanusk.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "787921911781-55c4rs8cgae2oq10777jvpmcq6psiemg.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.khoaluan"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:787921911781:android:b3e06487d74aa715de790c",
+        "android_client_info": {
+          "package_name": "com.example.khoaluan"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "787921911781-a8i12hi1rfo8nmltmo90smmffvaanusk.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWwKMrOjy0ekFBJ5yNDtLTWfuBiskig04"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "787921911781-a8i12hi1rfo8nmltmo90smmffvaanusk.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "787921911781-55c4rs8cgae2oq10777jvpmcq6psiemg.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.khoaluan"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
