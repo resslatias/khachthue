@@ -1,32 +1,18 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 
 class AuthService {
-
-  AuthService._internal();
-  static final AuthService _instance = AuthService._internal();
-  factory AuthService() => _instance;
-/// --> 3 dòng trên giúp toàn app dùng chung 1 authsevier
-  ///
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String usersCol = 'nguoi_thue';
-
   String? _lastError;
   String? get lastError => _lastError;
 
-  /// Gọi trong main() nếu bạn muốn
-  Future<void> initialize() async {
-    try {
-      await Firebase.initializeApp();
-    } catch (_) {/* đã init rồi thì bỏ qua */}
-  }
-
   /// ====== YÊU CẦU 1: Kiểm tra đăng nhập (true/false)
-  bool get isLoggedIn => _auth.currentUser != null;
-  Stream<bool> get authState => _auth.authStateChanges().map((u) => u != null);
+  Future<bool> isLoggedInOnce() async {
+    final user = await _auth.authStateChanges().first;
+    return user != null;
+  }
 
   /// ====== YÊU CẦU 2: Lấy thông tin người dùng hiện tại (Map data)
   Future<Map<String, dynamic>?> currentUserData() async {
@@ -69,24 +55,29 @@ class AuthService {
         email: email.trim(),
         password: password,
       );
-
       await cred.user?.updateDisplayName(hoTen.trim());
-
       // tạo/đảm bảo hồ sơ Firestore
       final uid = cred.user!.uid;
       final ref = _db.collection(usersCol).doc(uid);
-      final now = FieldValue.serverTimestamp();
       await ref.set({
         'ho_ten': hoTen.trim(),
         'email': email.trim(),
         'so_dien_thoai': (soDienThoai ?? '').trim(),
+        'ngay_sinh': null,
+        'anh_dai_dien':null,
       }, SetOptions(merge: true));
-
+      // >>> THÊM THÔNG BÁO CHO NGƯỜI DÙNG VỪA ĐĂNG KÝ <<<
+      await _db.collection('thong_bao').add({
+        'tieu_de'    : 'Chào mừng bạn!',
+        'noi_dung'   : 'Tài khoản của bạn đã được tạo thành công.',
+        'nguoi_nhan' : uid,
+        'da_xem_chua': false,
+        'ngay_tao'   : FieldValue.serverTimestamp()
+      });
       // không bắt buộc, có thể lỗi nhưng không ảnh hưởng kết quả
       try {
         await cred.user?.sendEmailVerification();
       } catch (_) {}
-
       _lastError = null;
       return true;
     } on FirebaseAuthException catch (e) {
@@ -97,7 +88,6 @@ class AuthService {
       return false;
     }
   }
-
   /// ====== YÊU CẦU 5: Quên mật khẩu (không trả gì)
   Future<void> sendResetPassword(String email) async {
     try {
@@ -111,10 +101,12 @@ class AuthService {
     }
   }
 
+
   /// Tiện ích thêm: đăng xuất
   Future<void> signOut() => _auth.signOut();
 
-  // ====== Helper: map lỗi FirebaseAuth -> tiếng Việt
+
+  /// ====== Helper: map lỗi FirebaseAuth -> tiếng Việt
   String _mapAuthError(FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-email':

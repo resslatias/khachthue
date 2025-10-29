@@ -1,26 +1,28 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';           // +++
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:khachthue/subpage/befor.dart';
 import 'package:khachthue/subpage/home.dart';
 import 'package:khachthue/subpage/me.dart';
 import 'package:khachthue/subpage/new.dart';
 import 'package:khachthue/subpage/orther.dart';
+
 import 'auth_login/AuthService.dart';
 import 'auth_login/LoginPage.dart';
 import 'auth_login/RegisterPage.dart';
 import 'check/network_service.dart';
 import 'check/app_navigator.dart';
 
-
 enum TabItem { home, me, before, news, other }
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  //await AuthService().initialize();
+  WidgetsFlutterBinding.ensureInitialized();                 // +++
+  await Firebase.initializeApp();                            // +++
   runApp(const MyApp());
 }
 
-/// App gốc: theme, routes, và Shell (khung chính)
+/// App gốc
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -30,24 +32,23 @@ class MyApp extends StatelessWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      navigatorKey: AppNavigator.key, // Thêm navigatorKey cho NetworkService
+      navigatorKey: AppNavigator.key, // OK: chỉ dùng ở MaterialApp gốc
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: seed),
         scaffoldBackgroundColor: const Color(0xFFF5F6FA),
       ),
+      home: const Shell(),                                      // +++ đặt Shell là màn chính
       routes: {
         '/login': (_) => const LoginPage(),
         '/register': (_) => const RegisterPage(),
       },
-      home: const Shell(),
     );
   }
 }
 
 class Shell extends StatefulWidget {
   const Shell({super.key});
-
   @override
   State<Shell> createState() => _ShellState();
 }
@@ -55,8 +56,8 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> {
   TabItem _current = TabItem.home;
 
-  // Mỗi tab có Navigator riêng để giữ stack khi chuyển tab
-  final _navKeys = {
+  // Mỗi tab có Navigator riêng
+  final _navKeys = <TabItem, GlobalKey<NavigatorState>>{
     TabItem.home: GlobalKey<NavigatorState>(),
     TabItem.me: GlobalKey<NavigatorState>(),
     TabItem.before: GlobalKey<NavigatorState>(),
@@ -71,12 +72,7 @@ class _ShellState extends State<Shell> {
     super.initState();
     NetworkService.instance.ensureStarted();
     _netSub = NetworkService.instance.onChanged.listen((ok) {
-      // Có thể thêm logic khi mạng thay đổi
-      if (!ok) {
-        debugPrint('Mất kết nối mạng');
-      } else {
-        debugPrint('Đã kết nối mạng');
-      }
+      debugPrint(ok ? 'Đã kết nối mạng' : 'Mất kết nối mạng');
     });
   }
 
@@ -100,19 +96,16 @@ class _ShellState extends State<Shell> {
       child: Scaffold(
         body: Column(
           children: [
-            // Header cố định
             const HeaderSection(),
-
-            // Nội dung giữ trạng thái các tab
             Expanded(
               child: IndexedStack(
                 index: index,
                 children: [
-                  _TabNav(key: _navKeys[TabItem.home], builder: (_) => const HomePage()),
-                  _TabNav(key: _navKeys[TabItem.me], builder: (_) => const MePage()),
-                  _TabNav(key: _navKeys[TabItem.before], builder: (_) => const BeforPage()),
-                  _TabNav(key: _navKeys[TabItem.news], builder: (_) => const NewsPage()),
-                  _TabNav(key: _navKeys[TabItem.other], builder: (_) => const OrtherPage()),
+                  _TabNav(navKey: _navKeys[TabItem.home]!,   builder: (_) => const HomePage()),
+                  _TabNav(navKey: _navKeys[TabItem.me]!,     builder: (_) => const MePage()),
+                  _TabNav(navKey: _navKeys[TabItem.before]!, builder: (_) => const BeforPage()),
+                  _TabNav(navKey: _navKeys[TabItem.news]!,   builder: (_) => const NewsPage()),
+                  _TabNav(navKey: _navKeys[TabItem.other]!,  builder: (_) => const OrtherPage()),
                 ],
               ),
             ),
@@ -127,8 +120,8 @@ class _ShellState extends State<Shell> {
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Trang chủ'),
             BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Tài khoản'),
-            BottomNavigationBarItem(icon: Icon(Icons.access_time_filled), label: 'Lịch sử'),
-            BottomNavigationBarItem(icon: Icon(Icons.local_fire_department_outlined), label: 'Nổi bật'),
+            BottomNavigationBarItem(icon: Icon(Icons.access_time), label: 'Lịch sử'),
+            BottomNavigationBarItem(icon: Icon(Icons.add_alert_outlined), label: 'Thông báo'),
             BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'Khác'),
           ],
         ),
@@ -137,14 +130,16 @@ class _ShellState extends State<Shell> {
   }
 }
 
-// Navigator riêng cho từng tab để giữ lịch sử trong tab
+// Navigator riêng cho từng tab (GẮN key vào Navigator)
 class _TabNav extends StatelessWidget {
   final WidgetBuilder builder;
-  const _TabNav({super.key, required this.builder});
+  final GlobalKey<NavigatorState> navKey;
+  const _TabNav({super.key, required this.builder, required this.navKey});
 
   @override
   Widget build(BuildContext context) {
     return Navigator(
+      key: navKey, // +++ quan trọng
       onGenerateRoute: (settings) => MaterialPageRoute(
         builder: builder,
         settings: settings,
@@ -152,6 +147,7 @@ class _TabNav extends StatelessWidget {
     );
   }
 }
+
 /// ════════════════════════════════════════════════════════
 /// HEADER: hiện avatar/tên khi đã đăng nhập; nút Đăng nhập/Đăng ký khi chưa
 /// ════════════════════════════════════════════════════════
@@ -171,13 +167,14 @@ class HeaderSection extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 14 + 12, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 26, 16, 16),
       constraints: const BoxConstraints(minHeight: 86),
-      child: StreamBuilder<bool>(
-        stream: auth.authState,            // Stream<bool> từ AuthService
-        initialData: auth.isLoggedIn,      // bool hiện tại
+      child: StreamBuilder<User?>(
+        // Lắng nghe thay đổi đăng nhập từ FirebaseAuth
+        stream: FirebaseAuth.instance.authStateChanges(),
+        initialData: FirebaseAuth.instance.currentUser,
         builder: (context, authSnapshot) {
-          final isLoggedIn = authSnapshot.data ?? false;
+          final isLoggedIn = authSnapshot.data != null;
 
           if (!isLoggedIn) {
             // Chưa đăng nhập
@@ -230,7 +227,7 @@ class HeaderSection extends StatelessWidget {
               final displayName =
               (profile?['ho_ten'] as String?)?.trim().isNotEmpty == true
                   ? profile!['ho_ten'] as String
-                  : 'Đã đăng nhập';
+                  : (FirebaseAuth.instance.currentUser?.displayName ?? 'Đã đăng nhập');
               final avatarUrl = (profile?['anh_dai_dien'] as String?) ?? '';
 
               return Row(
