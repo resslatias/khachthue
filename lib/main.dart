@@ -14,7 +14,9 @@ import 'check/app_navigator.dart';
 
 enum TabItem { home, me, before, news, other }
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  //await AuthService().initialize();
   runApp(const MyApp());
 }
 
@@ -150,7 +152,6 @@ class _TabNav extends StatelessWidget {
     );
   }
 }
-
 /// ════════════════════════════════════════════════════════
 /// HEADER: hiện avatar/tên khi đã đăng nhập; nút Đăng nhập/Đăng ký khi chưa
 /// ════════════════════════════════════════════════════════
@@ -173,21 +174,16 @@ class HeaderSection extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 14 + 12, 16, 16),
       constraints: const BoxConstraints(minHeight: 86),
       child: StreamBuilder<bool>(
-        stream: auth.authState,
-        builder: (context, snapshot) {
-          final isLoggedIn = snapshot.data ?? false;
-          final displayName = auth.displayName ?? 'Đã đăng nhập';
-          final avatarUrl = auth.photoURL;
+        stream: auth.authState,            // Stream<bool> từ AuthService
+        initialData: auth.isLoggedIn,      // bool hiện tại
+        builder: (context, authSnapshot) {
+          final isLoggedIn = authSnapshot.data ?? false;
 
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Avatar / Icon
-              if (isLoggedIn && avatarUrl != null && avatarUrl.isNotEmpty)
-                CircleAvatar(radius: 18, backgroundImage: NetworkImage(avatarUrl))
-              else if (isLoggedIn)
-                const CircleAvatar(radius: 18, child: Icon(Icons.person))
-              else
+          if (!isLoggedIn) {
+            // Chưa đăng nhập
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
                 Container(
                   height: 36,
                   width: 36,
@@ -197,27 +193,20 @@ class HeaderSection extends StatelessWidget {
                   ),
                   child: const Icon(Icons.sports_tennis, color: Colors.white),
                 ),
-
-              const SizedBox(width: 12),
-
-              // Tên người dùng / trạng thái
-              Expanded(
-                child: Text(
-                  isLoggedIn ? displayName : 'Bạn chưa đăng nhập',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Bạn chưa đăng nhập',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-
-              const SizedBox(width: 8),
-
-              // Nút login/register khi chưa đăng nhập
-              if (!isLoggedIn) ...[
+                const SizedBox(width: 8),
                 _SmallButton(
                   label: 'Đăng nhập',
                   filled: true,
@@ -229,13 +218,50 @@ class HeaderSection extends StatelessWidget {
                   filled: false,
                   onTap: () => Navigator.of(context, rootNavigator: true).pushNamed('/register'),
                 ),
-              ] else
-                _SmallButton(
-                  label: 'Đăng xuất',
-                  filled: false,
-                  onTap: () => auth.signOut(),
-                ),
-            ],
+              ],
+            );
+          }
+
+          // Đã đăng nhập: lấy hồ sơ hiện tại 1 lần (Map<String,dynamic>?)
+          return FutureBuilder<Map<String, dynamic>?>(
+            future: auth.currentUserData(),
+            builder: (context, profileSnapshot) {
+              final profile = profileSnapshot.data;
+              final displayName =
+              (profile?['ho_ten'] as String?)?.trim().isNotEmpty == true
+                  ? profile!['ho_ten'] as String
+                  : 'Đã đăng nhập';
+              final avatarUrl = (profile?['anh_dai_dien'] as String?) ?? '';
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (avatarUrl.isNotEmpty)
+                    CircleAvatar(radius: 18, backgroundImage: NetworkImage(avatarUrl))
+                  else
+                    const CircleAvatar(radius: 18, child: Icon(Icons.person, color: Colors.white)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _SmallButton(
+                    label: 'Đăng xuất',
+                    filled: false,
+                    onTap: () => auth.signOut(),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
@@ -243,32 +269,39 @@ class HeaderSection extends StatelessWidget {
   }
 }
 
-/// Nút nhỏ dùng cho Header (Đăng nhập/Đăng ký)
+/// Nút nhỏ dùng trong Header
 class _SmallButton extends StatelessWidget {
   final String label;
   final bool filled;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   const _SmallButton({
     required this.label,
     required this.filled,
-    this.onTap,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        side: filled ? BorderSide.none : const BorderSide(color: Colors.white),
-        backgroundColor: filled ? Colors.white : Colors.transparent,
-        foregroundColor: filled ? cs.primary : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        decoration: BoxDecoration(
+          color: filled ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: filled ? cs.primary : Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
-      child: Text(label),
     );
   }
 }
