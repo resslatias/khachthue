@@ -13,12 +13,14 @@ import 'auth_login/LoginPage.dart';
 import 'auth_login/RegisterPage.dart';
 import 'check/network_service.dart';
 import 'check/app_navigator.dart';
+import 'data/demo_data.dart';
 
 enum TabItem { home, me, before, news, other }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();                 // +++
-  await Firebase.initializeApp();                            // +++
+  await Firebase.initializeApp();
+
   runApp(const MyApp());
 }
 
