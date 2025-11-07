@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'TrangThaiSan.dart';
+
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -493,7 +495,12 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             tooltip: 'Đánh giá',
           ),
           TextButton(
-            onPressed: _showReviewDialog,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const TrangThaiSan()),
+              );
+            },
             style: TextButton.styleFrom(
               foregroundColor: Colors.green,
             ),
