@@ -1,6 +1,80 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 
+
+Future<void> updateBangGia({
+  required String coSoId, // ví dụ '9ok6mAN7tDH0bjcTpGiG'
+  List<int>? newPrices,   // mảng 24 giá mới, nếu null thì dùng mặc định
+}) async {
+  final coSoRef = FirebaseFirestore.instance
+      .collection('co_so')
+      .doc(coSoId);
+
+  try {
+    // Tạo mảng mặc định 24 phần tử (giá = 24000)
+    final defaultPrices = List<int>.filled(24, 24000);
+
+    // Nếu người dùng có truyền newPrices thì dùng, không thì dùng mặc định
+    final bangGia = newPrices ?? defaultPrices;
+
+    // Kiểm tra document có tồn tại không
+    final doc = await coSoRef.get();
+
+    if (doc.exists) {
+      // Nếu có rồi thì ghi đè
+      await coSoRef.update({
+        'bang_gia': bangGia,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      print('✅ Đã cập nhật bảng giá thành công.');
+    } else {
+      // Nếu chưa có document → tạo mới
+      await coSoRef.set({
+        'bang_gia': bangGia,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      print('✅ Đã tạo mới document với bảng giá mặc định.');
+    }
+  } catch (e) {
+    print('❌ Lỗi khi cập nhật bảng giá: $e');
+  }
+}
+
+
+
+
+
+Future<void> addSanData() async {
+  // tham chiếu tới tài liệu cha
+  final coSoRef = FirebaseFirestore.instance
+      .collection('san')
+      .doc('9ok6mAN7tDH0bjcTpGiG') // ID tài liệu cha
+      .collection('san'); // subcollection 'san'
+
+  await coSoRef.add({
+    'ten_san': 'vip',
+    'mo_ta': 'sân đơn',
+    'gia_6_7': 80000,
+    'gia_7_8': 90000,
+    'gia_8_9': 100000,
+    'gia_9_10': 100000,
+    'gia_10_11': 90000,
+    'gia_11_12': 80000,
+    'gia_12_13': 75000,
+    'gia_13_14': 75000,
+    'gia_14_15': 80000,
+    'gia_15_16': 85000,
+    'gia_16_17': 90000,
+    'gia_17_18': 95000,
+    'gia_18_19': 100000,
+    'gia_19_20': 110000,
+    'gia_20_21': 120000,
+    'gia_21_22': 130000,
+    'createdAt': FieldValue.serverTimestamp(),
+  });
+
+  print('✅ Thêm dữ liệu sân thành công!');
+}
 /// Ghi 1 bản Cơ sở
 Future<DocumentReference<Map<String, dynamic>>> add_1_co_so() async {
   final co_so = {
