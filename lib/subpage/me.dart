@@ -5,6 +5,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 
+import 'package:khachthue/subpage/sub_in_me/like.dart';
+
 class MePage extends StatelessWidget {
   const MePage({super.key});
 
@@ -16,13 +18,11 @@ class MePage extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-
         final user = snapshot.data;
         if (user == null) {
           // Chưa đăng nhập
           return _NotLoggedInView();
         }
-
         // Đã đăng nhập
         return _LoggedInView(user: user);
       },
@@ -110,9 +110,14 @@ class _LoggedInView extends StatelessWidget {
                 onTap: () => _showChangePassword(context),
               ),
               _MenuItem(
-                icon: Icons.heart_broken,
+                icon: Icons.favorite,
                 title: 'Sân ưa thích',
-                onTap: () => _showComingSoon(context),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LikePage()),
+                  );
+                },
               ),
               _MenuItem(
                 icon: Icons.add_chart_outlined,
@@ -131,20 +136,21 @@ class _LoggedInView extends StatelessWidget {
     );
   }
 
+  // Hiện thống tin cá nhân
   void _showUserProfile(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => UserProfilePage(userId: user.uid)),
     );
   }
-
+ // Đỗi mật khẩu
   void _showChangePassword(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => const ChangePasswordDialog(),
     );
   }
-
+ // hiện tính năng đang phát triển
   void _showComingSoon(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Tính năng đang phát triển')),
@@ -209,6 +215,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
   }
 }
 
+ /// hiện sữa đỗi thông tin cá nhân
 class _UserProfileContent extends StatelessWidget {
   final String userId;
   final Map<String, dynamic> userData;
