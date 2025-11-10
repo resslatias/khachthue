@@ -347,41 +347,50 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
       return const SizedBox.shrink();
     }
 
-    // Parse giờ mở/đóng cửa
     final gioMo = int.tryParse(gioMoCua.split(':')[0]) ?? 6;
     final gioDong = int.tryParse(gioDongCua.split(':')[0]) ?? 22;
 
-    // Tạo danh sách giờ hoạt động
     List<Map<String, dynamic>> morningPrices = [];
     List<Map<String, dynamic>> afternoonPrices = [];
+    List<Map<String, dynamic>> nightPrices = [];
 
     for (int i = gioMo; i < gioDong; i++) {
       if (i < bangGia.length) {
         final price = bangGia[i];
         final priceData = {
-          'time': '${i}h-${i + 1}h',
+          'time': '${i}h - ${i + 1}h',
           'price': price is int ? price : (price as num).toInt(),
         };
 
         if (i < 12) {
           morningPrices.add(priceData);
-        } else {
+        } else if (i < 18) {
           afternoonPrices.add(priceData);
+        } else {
+          nightPrices.add(priceData);
         }
       }
     }
 
     return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
         gradient: LinearGradient(
           colors: [Colors.green.shade50, Colors.blue.shade50],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.green.shade200, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 2,
+            blurRadius: 5,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -389,86 +398,102 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             children: [
               Icon(Icons.attach_money, color: Colors.green.shade700, size: 24),
               const SizedBox(width: 8),
-              const Text(
-                'Bảng giá',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              const Text('Bảng giá theo khung giờ',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Buổi sáng
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.wb_sunny, color: Colors.orange.shade700, size: 18),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Buổi sáng',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...morningPrices.map((p) => _buildPriceRow(p['time'], p['price'])),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 16),
-              // Buổi chiều
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.nights_stay, color: Colors.blue.shade700, size: 18),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Buổi chiều',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ...afternoonPrices.map((p) => _buildPriceRow(p['time'], p['price'])),
-                  ],
-                ),
-              ),
-            ],
-          ),
+
+          if (morningPrices.isNotEmpty) ...[
+            _buildPriceSection(
+              title: 'Buổi sáng',
+              color: Colors.orange,
+              icon: Icons.wb_sunny,
+              prices: morningPrices,
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          if (afternoonPrices.isNotEmpty) ...[
+            _buildPriceSection(
+              title: 'Buổi chiều',
+              color: Colors.blue,
+              icon: Icons.cloud,
+              prices: afternoonPrices,
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          if (nightPrices.isNotEmpty)
+            _buildPriceSection(
+              title: 'Buổi tối',
+              color: Colors.deepPurple,
+              icon: Icons.nightlight_round,
+              prices: nightPrices,
+            ),
         ],
       ),
     );
   }
 
+  Widget _buildPriceSection({
+    required String title,
+    required Color color, // chấp nhận mọi loại Color
+    required IconData icon,
+    required List<Map<String, dynamic>> prices,
+  }) {
+    // ✅ Xác định màu chữ phù hợp (vẫn dùng shade700 nếu có)
+    final textColor = (color is MaterialColor)
+        ? color.shade700
+        : HSLColor.fromColor(color).withLightness(0.4).toColor();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...prices.map((p) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(p['time'], style: const TextStyle(fontSize: 14)),
+                ),
+                Text(
+                  '${_formatCurrency(p['price'])}đ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ),
+    );
+  }
   Widget _buildPriceRow(String time, int price) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),

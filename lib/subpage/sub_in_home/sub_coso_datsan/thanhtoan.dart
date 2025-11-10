@@ -34,33 +34,64 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
     try {
       String userId = auth.currentUser?.uid ?? 'khachquaduong';
 
-      // Load thông tin đơn hàng
-      final donDoc = await firestore
-          .collection('lich_su_khach')
-          .doc(userId)
-          .collection('don_dat')
-          .doc(widget.maDon)
-          .get();
+      // ⭐ SỬA: Đổi tên biến và thêm type casting
+      DocumentSnapshot? orderDocument;
+      for (int i = 0; i < 3; i++) {
+        try {
+          orderDocument = await firestore
+              .collection('lich_su_khach')
+              .doc(userId)
+              .collection('don_dat')
+              .doc(widget.maDon)
+              .get()
+              .timeout(const Duration(seconds: 5));
 
-      if (donDoc.exists) {
-        donDatData = donDoc.data();
+          if (orderDocument.exists) break;
+
+          if (i < 2) {
+            await Future.delayed(const Duration(seconds: 1));
+            debugPrint("🔄 Retry loading order data...");
+          }
+        } catch (e) {
+          debugPrint("Lỗi lần $i: $e");
+          if (i == 2) rethrow;
+        }
       }
 
-      // Load chi tiết đặt
+      if (orderDocument != null && orderDocument.exists) {
+        // ⭐ SỬA: Thêm type casting explicit
+        donDatData = orderDocument.data() as Map<String, dynamic>?;
+      } else {
+        debugPrint("Không tìm thấy đơn hàng sau 3 lần thử: ${widget.maDon}");
+        setState(() => isLoading = false);
+        return;
+      }
+
       final chiTietSnapshot = await firestore
           .collection('chi_tiet_dat')
           .doc(widget.maDon)
           .collection('danh_sach')
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 10));
 
+      // ⭐ SỬA: Thêm type casting cho chi tiết
       chiTietList = chiTietSnapshot.docs
-          .map((doc) => doc.data())
+          .map((doc) => doc.data() as Map<String, dynamic>)
           .toList();
 
       setState(() => isLoading = false);
     } catch (e) {
       debugPrint("Lỗi load order: $e");
       setState(() => isLoading = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi tải thông tin đơn hàng: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -80,24 +111,116 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
     }
   }
 
+  Future<void> _processPayment() async {
+    try {
+      String userId = auth.currentUser?.uid ?? 'khachquaduong';
+      String coSoId = donDatData!['co_so_id'] as String;
+
+      // 1. Cập nhật trạng thái thanh toán trong lich_su_khach
+      await firestore
+          .collection('lich_su_khach')
+          .doc(userId)
+          .collection('don_dat')
+          .doc(widget.maDon)
+          .update({
+        'trang_thai': 'da_thanh_toan',
+        'timeup': null,
+      });
+
+      // 2. Cập nhật trạng thái thanh toán trong lich_su_san
+      await firestore
+          .collection('lich_su_san')
+          .doc(coSoId)
+          .collection('khach_dat')
+          .doc(widget.maDon)
+          .update({
+        'trang_thai': 'da_thanh_toan',
+        'timeup': null,
+      });
+
+      // 3. Xóa timeup trong dat_san cho tất cả các sân đã đặt
+      for (var chiTiet in chiTietList) {
+        String maSan = chiTiet['ma_san'] as String;
+        String gio = chiTiet['gio'] as String;
+        String ngayDat = chiTiet['ngay_dat'] as String;
+        String timeupKey = '${maSan}_timeup';
+
+        await firestore
+            .collection('dat_san')
+            .doc(coSoId)
+            .collection(ngayDat)
+            .doc(gio)
+            .update({
+          timeupKey: null,
+        });
+      }
+
+      // 4. Tạo thông báo thanh toán thành công
+      await firestore
+          .collection('thong_bao')
+          .doc(userId)
+          .collection('notifications')
+          .add({
+        'tieu_de': 'Thanh toán thành công',
+        'noi_dung': 'Đơn hàng ${widget.maDon} đã được thanh toán thành công',
+        'da_xem_chua': false,
+        'Urlweb': null,
+        'Urlimage': null,
+        'ngay_tao': FieldValue.serverTimestamp(),
+      });
+
+      // 5. Cập nhật UI
+      setState(() {
+        donDatData!['trang_thai'] = 'da_thanh_toan';
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Thanh toán thành công!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+
+    } catch (e) {
+      debugPrint('Lỗi thanh toán: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi thanh toán: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _confirmPayment() async {
-    // TODO: Tích hợp API thanh toán tạo QR
-    showDialog(
+    bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Thông báo'),
-        content: const Text(
-          'Tính năng thanh toán QR đang được phát triển. '
-              'Vui lòng thanh toán trực tiếp tại cơ sở hoặc liên hệ qua số điện thoại.',
-        ),
+        title: const Text('Xác nhận thanh toán'),
+        content: const Text('Bạn có chắc chắn muốn thanh toán đơn hàng này?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade700,
+            ),
+            child: const Text('Xác nhận', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
+
+    if (confirmed == true) {
+      await _processPayment();
+    }
   }
 
   @override
@@ -181,7 +304,7 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8), // GIẢM BO GÓC
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -235,7 +358,7 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8), // GIẢM BO GÓC
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -326,7 +449,7 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8), // GIẢM BO GÓC
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -356,7 +479,7 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(6), // GIẢM BO GÓC
                 border: Border.all(color: Colors.green.shade200),
               ),
               child: Row(
@@ -365,7 +488,7 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: Colors.green.shade700,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6), // GIẢM BO GÓC
                     ),
                     child: const Icon(
                       Icons.sports_tennis,
@@ -418,7 +541,7 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8), // GIẢM BO GÓC
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
@@ -442,7 +565,7 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6), // GIẢM BO GÓC
               border: Border.all(color: Colors.blue.shade200),
             ),
             child: Row(
@@ -478,7 +601,7 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6), // GIẢM BO GÓC
               border: Border.all(color: Colors.orange.shade200),
             ),
             child: Row(
@@ -562,7 +685,7 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
                       ? Colors.grey
                       : Colors.green.shade700,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(6), // GIẢM BO GÓC
                   ),
                   elevation: 3,
                 ),

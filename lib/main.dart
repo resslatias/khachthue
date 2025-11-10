@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';           // +++
 import 'package:firebase_auth/firebase_auth.dart';
@@ -20,25 +21,33 @@ enum TabItem { home, me, before, news, other }
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();                 // +++
   await Firebase.initializeApp();
- /* await updateBangGia(
-    coSoId: 'Stn9qQs4D9rx7Cq6bgE8',
-    newPrices: [
-      24000, 20000, 26000, 27000, 28000, 29000,
-      30000, 31000, 32000, 33000, 34000, 35000,
-      36000, 37000, 338000, 39000, 40000, 41000,
-      42000, 43000, 44000, 45000, 46000, 47000
-    ],
-  );
-  await updateBangGia(
-    coSoId: 'VF39Xtatl35LH0TNCPYj',
-    newPrices: [
-      24000, 20000, 26000, 27000, 28000, 29000,
-      30000, 31000, 32000, 33000, 34000, 35000,
-      36000, 37000, 338000, 39000, 40000, 41000,
-      42000, 43000, 44000, 45000, 46000, 47000
-    ],
-  );*/
+  await _cleanupExpiredCourtsOnStartup();
   runApp(const MyApp());
+}
+
+Future<void> _cleanupExpiredCourtsOnStartup() async {
+  try {
+    final firestore = FirebaseFirestore.instance;
+    final auth = FirebaseAuth.instance;
+
+    // Chỉ chạy nếu user đã login
+    if (auth.currentUser == null) return;
+
+    debugPrint("🔄 Đang dọn dẹp sân hết hạn khi khởi động app...");
+
+    // Lấy tất cả sân mà user này đang chọn (trạng thái 2)
+    // Lưu ý: Cần có collection lưu thông tin user đang chọn sân nào
+    // Hoặc quét toàn bộ dat_san (không khả thi cho production)
+
+    // Giải pháp đơn giản: Dựa vào temp_timeup
+    final now = DateTime.now();
+
+    // 🎯 TẠM THỜI: Chúng ta sẽ xử lý trong từng trang cụ thể
+    // Khi user vào trang TrangThaiSan, chúng ta sẽ dọn dẹp
+
+  } catch (e) {
+    debugPrint("❌ Lỗi dọn dẹp khi khởi động: $e");
+  }
 }
 
 /// App gốc
