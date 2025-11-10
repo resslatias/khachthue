@@ -20,7 +20,7 @@ enum TabItem { home, me, before, news, other }
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();                 // +++
   await Firebase.initializeApp();
-  await updateBangGia(
+ /* await updateBangGia(
     coSoId: 'Stn9qQs4D9rx7Cq6bgE8',
     newPrices: [
       24000, 20000, 26000, 27000, 28000, 29000,
@@ -37,8 +37,7 @@ Future<void> main() async {
       36000, 37000, 338000, 39000, 40000, 41000,
       42000, 43000, 44000, 45000, 46000, 47000
     ],
-  );
-
+  );*/
   runApp(const MyApp());
 }
 

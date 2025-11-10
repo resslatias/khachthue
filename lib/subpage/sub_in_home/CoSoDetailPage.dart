@@ -36,7 +36,6 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
     }
 
     try {
-      // Cấu trúc mới: san_ua_thich/{userId}/co_so/{coSoId}
       final docSnapshot = await FirebaseFirestore.instance
           .collection('san_ua_thich')
           .doc(user.uid)
@@ -61,7 +60,6 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
     }
 
     try {
-      // Cấu trúc mới: san_ua_thich/{userId}/co_so/{coSoId}
       final docRef = FirebaseFirestore.instance
           .collection('san_ua_thich')
           .doc(user.uid)
@@ -160,7 +158,12 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const TrangThaiSan()),
+                MaterialPageRoute(
+                  builder: (context) => TrangThaiSan(
+                    coSoId: widget.coSoId,
+                    coSoData: widget.coSoData,
+                  ),
+                ),
               );
             },
             style: TextButton.styleFrom(
@@ -170,6 +173,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
           ),
         ],
       ),
+/*
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,7 +184,28 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             _buildReviewsSection(),
           ],
         ),
+      ),*/
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8), // 👈 giảm khoảng cách phía trên
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildImageGallery(),
+              const SizedBox(height: 8), // 👈 khoảng cách nhỏ giữa các phần
+              _buildInfoSection(),
+              const SizedBox(height: 8),
+              _buildMapButton(),
+              const SizedBox(height: 8),
+              _buildReviewsSection(),
+            ],
+          ),
+        ),
       ),
+
+
+
+
     );
   }
 
@@ -207,7 +232,10 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
         itemCount: images.length,
         itemBuilder: (context, index) {
           return Padding(
-            padding: EdgeInsets.only(left: index == 0 ? 16 : 8, right: index == images.length - 1 ? 16 : 0),
+            padding: EdgeInsets.only(
+              left: index == 0 ? 16 : 8,
+              right: index == images.length - 1 ? 16 : 0,
+            ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
@@ -229,6 +257,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
     );
   }
 
+  // ĐÃ GỘP 2 METHOD _buildInfoSection() THÀNH 1
   Widget _buildInfoSection() {
     final data = widget.coSoData;
     return Padding(
@@ -241,11 +270,17 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          _buildInfoRow(Icons.location_on, 'Địa chỉ',
-              '${data['dia_chi_chi_tiet']}, ${data['xa']}, ${data['huyen']}, ${data['tinh']}'),
+          _buildInfoRow(
+            Icons.location_on,
+            'Địa chỉ',
+            '${data['dia_chi_chi_tiet']}, ${data['xa']}, ${data['huyen']}, ${data['tinh']}',
+          ),
           _buildInfoRow(Icons.phone, 'Số điện thoại', data['sdt'] as String? ?? ''),
-          _buildInfoRow(Icons.access_time, 'Giờ mở cửa',
-              '${data['gio_mo_cua']} - ${data['gio_dong_cua']}'),
+          _buildInfoRow(
+            Icons.access_time,
+            'Giờ mở cửa',
+            '${data['gio_mo_cua']} - ${data['gio_dong_cua']}',
+          ),
           if ((data['web'] as String?)?.isNotEmpty == true)
             _buildInfoRow(Icons.language, 'Website', data['web'] as String),
           const SizedBox(height: 16),
@@ -255,6 +290,8 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             data['mo_ta'] as String? ?? 'Chưa có mô tả',
             style: const TextStyle(fontSize: 14, height: 1.5),
           ),
+          const SizedBox(height: 24),
+          _buildPriceTable(),
         ],
       ),
     );
@@ -298,6 +335,177 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPriceTable() {
+    final bangGia = widget.coSoData['bang_gia'] as List<dynamic>?;
+    final gioMoCua = widget.coSoData['gio_mo_cua'] as String?;
+    final gioDongCua = widget.coSoData['gio_dong_cua'] as String?;
+
+    if (bangGia == null || bangGia.isEmpty || gioMoCua == null || gioDongCua == null) {
+      return const SizedBox.shrink();
+    }
+
+    // Parse giờ mở/đóng cửa
+    final gioMo = int.tryParse(gioMoCua.split(':')[0]) ?? 6;
+    final gioDong = int.tryParse(gioDongCua.split(':')[0]) ?? 22;
+
+    // Tạo danh sách giờ hoạt động
+    List<Map<String, dynamic>> morningPrices = [];
+    List<Map<String, dynamic>> afternoonPrices = [];
+
+    for (int i = gioMo; i < gioDong; i++) {
+      if (i < bangGia.length) {
+        final price = bangGia[i];
+        final priceData = {
+          'time': '${i}h-${i + 1}h',
+          'price': price is int ? price : (price as num).toInt(),
+        };
+
+        if (i < 12) {
+          morningPrices.add(priceData);
+        } else {
+          afternoonPrices.add(priceData);
+        }
+      }
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green.shade50, Colors.blue.shade50],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.green.shade200, width: 2),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.attach_money, color: Colors.green.shade700, size: 24),
+              const SizedBox(width: 8),
+              const Text(
+                'Bảng giá',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Buổi sáng
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.wb_sunny, color: Colors.orange.shade700, size: 18),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Buổi sáng',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...morningPrices.map((p) => _buildPriceRow(p['time'], p['price'])),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Buổi chiều
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.nights_stay, color: Colors.blue.shade700, size: 18),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Buổi chiều',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...afternoonPrices.map((p) => _buildPriceRow(p['time'], p['price'])),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceRow(String time, int price) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: Colors.green.shade400,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              time,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+          ),
+          Text(
+            '${_formatCurrency(price)}đ',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: Colors.green.shade700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatCurrency(int amount) {
+    return amount.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
     );
   }
 
