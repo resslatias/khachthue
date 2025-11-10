@@ -90,6 +90,9 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     final gioDong = int.tryParse((widget.coSoData['gio_dong_cua'] as String?)?.split(':')[0] ?? '22') ?? 22;
     hours = List.generate(gioDong - gioMo, (i) => gioMo + i);
 
+    // 🆕 THÊM DÒNG NÀY: DỌN DẸP KHI VÀO TRANG
+    await _cleanupAllExpiredCourts();
+
     await ensureDayDataExists(formatDate(selectedDate));
     setupListeners();
 
@@ -157,6 +160,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
   }
 
   // QUAN TRỌNG: Hàm kiểm tra và reset timeouts
+  // SỬA: Chỉ reset trạng thái 2, không reset trạng thái 3
   Future<void> _checkAndResetTimeouts(QuerySnapshot snapshot) async {
     final now = DateTime.now();
 
@@ -165,8 +169,8 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
 
       for (int i = 1; i <= soSan; i++) {
         String sanKey = 'san$i';
-        String tempTimeupKey = '${sanKey}_temp_timeup'; // 🆕
-        String paymentTimeupKey = '${sanKey}_payment_timeup'; // 🆕
+        String tempTimeupKey = '${sanKey}_temp_timeup';
+        String paymentTimeupKey = '${sanKey}_payment_timeup';
 
         int currentStatus = data[sanKey] ?? 1;
 
@@ -177,7 +181,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
             try {
               await doc.reference.update({
                 sanKey: 1,
-                tempTimeupKey: null, // Xóa temp_timeup
+                tempTimeupKey: null,
               });
               debugPrint("✅ Đã reset sân $sanKey (2→1) - xóa temp_timeup");
             } catch (e) {
@@ -186,16 +190,16 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
           }
         }
 
-        // 🆕 XỬ LÝ TRẠNG THÁI 3: Kiểm tra payment_timeup
+        // 🆕 XỬ LÝ TRẠNG THÁI 3: Kiểm tra payment_timeup (thời gian kết thúc sân)
         if (currentStatus == 3 && data[paymentTimeupKey] != null) {
           Timestamp paymentTimeup = data[paymentTimeupKey] as Timestamp;
           if (paymentTimeup.toDate().isBefore(now)) {
             try {
-              // Reset về 1 nhưng GIỮ NGUYÊN payment_timeup
+              // Reset về 1 nhưng GIỮ NGUYÊN payment_timeup (lịch sử)
               await doc.reference.update({
                 sanKey: 1,
               });
-              debugPrint("✅ Đã reset sân $sanKey (3→1) - giữ payment_timeup");
+              debugPrint("✅ Đã reset sân $sanKey (3→1) - hết giờ sân");
             } catch (e) {
               debugPrint("🔥 Lỗi reset payment_timeup: $e");
             }
@@ -577,17 +581,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       ) async {
     if (!mounted) return;
 
-    // ⏳ HIỂN THỊ LOADING
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false,
-        child: const Center(
-          child: CircularProgressIndicator(),
-        ),
-      ),
-    );
+    // 🚫 BỎ HIỂN THỊ LOADING DIALOG
 
     try {
       String ngayDat = formatDate(selectedDate);
@@ -613,17 +607,14 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         String paymentTimeupKey = p['paymentTimeupKey'];
         String hourPath = "${(p['hour'] as int).toString().padLeft(2, '0')}:00";
 
-        // 🎯 QUAN TRỌNG:
-        // - Xóa temp_timeup (trạng thái 2)
-        // - Tạo payment_timeup mới (trạng thái 3)
-        // - Chuyển trạng thái từ 2 sang 3
+        // 🎯 QUAN TRỌNG: Chỉ cập nhật trạng thái, không reset timeup
         await (p['ref'] as DocumentReference).update({
           sanKey: 3, // 2 → 3
           tempTimeupKey: null, // 🆕 XÓA temp_timeup
           paymentTimeupKey: timeoutTimestamp, // 🆕 TẠO payment_timeup mới
         });
 
-        debugPrint("✅ Đã cập nhật ${p['sanKey']}: 2→3 (xóa temp_timeup, tạo payment_timeup)");
+        debugPrint("✅ Đã cập nhật ${p['sanKey']}: 2→3");
 
         danhSachDat.add({
           'ma_san': sanKey,
@@ -633,7 +624,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         });
       }
 
-      debugPrint("✅ Đã update trạng thái sân - tạo payment_timeup mới");
+      debugPrint("✅ Đã update trạng thái sân");
 
       // 💾 LƯU ĐƠN HÀNG VÀO LỊCH SỬ KHÁCH
       Map<String, dynamic> donDatDataKhach = {
@@ -647,7 +638,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         'tong_tien': tongTien,
         'trang_thai': 'chua_thanh_toan',
         'ngay_dat': ngayDat,
-        'timeup': timeoutTimestamp, // Timeout cho thanh toán
+        'timeup': timeoutTimestamp,
       };
 
       await firestore
@@ -702,15 +693,13 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
           .map((p) => "Sân ${p['san'] + 1} lúc ${p['hour']}-${p['hour'] + 1}h")
           .join(", ");
 
-      String formattedTime = DateFormat('HH:mm dd/MM/yyyy').format(timeoutTime);
-
       await firestore
           .collection('thong_bao')
           .doc(userId)
           .collection('notifications')
           .add({
         'tieu_de': 'Đặt sân thành công',
-        'noi_dung': 'Bạn đã đặt $danhSachSan tại ${widget.coSoData['ten']}. Vui lòng thanh toán trước $formattedTime',
+        'noi_dung': 'Bạn đã đặt $danhSachSan tại ${widget.coSoData['ten']}',
         'da_xem_chua': false,
         'Urlweb': null,
         'Urlimage': null,
@@ -720,19 +709,11 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       // 🎉 HOÀN TẤT - DỌN DẸP
       _rollbackTimer?.cancel();
 
-      // Đóng dialog loading
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-
       if (mounted) {
         _showSnackBar('Đặt sân thành công!', Colors.green);
       }
 
-      // ⏳ ĐỢI DỮ LIỆU ĐƯỢC LƯU
-      await Future.delayed(const Duration(seconds: 2));
-
-      // 🚀 CHUYỂN TRANG THANH TOÁN
+      // 🚀 CHUYỂN TRANG THANH TOÁN NGAY - KHÔNG DELAY
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
@@ -744,11 +725,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     } catch (e, stackTrace) {
       debugPrint("🔥 Lỗi confirm: $e");
       debugPrint("Stack trace: $stackTrace");
-
-      // Đóng dialog loading khi lỗi
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
 
       if (mounted) {
         _showSnackBar("Lỗi xác nhận: $e", Colors.red);

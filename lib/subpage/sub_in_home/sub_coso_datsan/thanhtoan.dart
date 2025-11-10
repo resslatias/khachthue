@@ -138,21 +138,40 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
         'timeup': null,
       });
 
-      // 3. Xóa timeup trong dat_san cho tất cả các sân đã đặt
+      // 3. 🆕 CẬP NHẬT QUAN TRỌNG: Đặt payment_timeup thành thời gian kết thúc của sân
       for (var chiTiet in chiTietList) {
         String maSan = chiTiet['ma_san'] as String;
-        String gio = chiTiet['gio'] as String;
-        String ngayDat = chiTiet['ngay_dat'] as String;
-        String timeupKey = '${maSan}_timeup';
+        String gio = chiTiet['gio'] as String; // Format: "08:00"
+        String ngayDat = chiTiet['ngay_dat'] as String; // Format: "dd_MM_yyyy"
+        String paymentTimeupKey = '${maSan}_payment_timeup';
 
-        await firestore
-            .collection('dat_san')
-            .doc(coSoId)
-            .collection(ngayDat)
-            .doc(gio)
-            .update({
-          timeupKey: null,
-        });
+        // 🎯 CHUYỂN ĐỔI: Từ "dd_MM_yyyy" và "HH:mm" sang DateTime cho thời gian kết thúc
+        try {
+          List<String> dateParts = ngayDat.split('_');
+          int day = int.parse(dateParts[0]);
+          int month = int.parse(dateParts[1]);
+          int year = int.parse(dateParts[2]);
+
+          List<String> timeParts = gio.split(':');
+          int hour = int.parse(timeParts[0]);
+
+          // 🆕 TẠO THỜI GIAN KẾT THÚC: giờ bắt đầu + 1 tiếng
+          DateTime endTime = DateTime(year, month, day, hour + 1);
+          Timestamp endTimestamp = Timestamp.fromDate(endTime);
+
+          await firestore
+              .collection('dat_san')
+              .doc(coSoId)
+              .collection(ngayDat)
+              .doc(gio)
+              .update({
+            paymentTimeupKey: endTimestamp,
+          });
+
+          debugPrint("✅ Đã cập nhật $paymentTimeupKey thành ${endTime.toString()}");
+        } catch (e) {
+          debugPrint("❌ Lỗi chuyển đổi thời gian cho $maSan: $e");
+        }
       }
 
       // 4. Tạo thông báo thanh toán thành công
