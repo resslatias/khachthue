@@ -32,14 +32,36 @@ class _NewsPageState extends State<NewsPage> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        // Header nhỏ cho trang
+        Container(
+          margin: const EdgeInsets.only(top: 10), // 👈 cách ra phía trên 20 đơn vị
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Row(
+            children: [
+              Icon(Icons.notifications, color: Color(0xFFC44536), size: 24),
+              SizedBox(width: 8),
+              Text(
+                'Thông báo',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2C3E50),
+                ),
+              ),
+            ],
+          ),
+        ),
+
         // Thanh filter & actions
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Row(
             children: [
               FilterChip(
-                label: const Text('Chỉ hiện chưa đọc'),
+                label: Text('Chỉ hiện chưa đọc', style: TextStyle(fontSize: 13)),
                 selected: _onlyUnread,
+                selectedColor: Color(0xFFC44536).withOpacity(0.2),
+                checkmarkColor: Color(0xFFC44536),
                 onSelected: _currentUser != null
                     ? (v) => setState(() => _onlyUnread = v)
                     : null,
@@ -48,8 +70,8 @@ class _NewsPageState extends State<NewsPage> {
               if (_currentUser != null)
                 TextButton.icon(
                   onPressed: _markAllAsRead,
-                  icon: const Icon(Icons.done_all, size: 18),
-                  label: const Text('Đánh dấu đã đọc'),
+                  icon: Icon(Icons.done_all, size: 18, color: Color(0xFFC44536)),
+                  label: Text('Đánh dấu đã đọc', style: TextStyle(color: Color(0xFFC44536))),
                 ),
             ],
           ),
@@ -68,14 +90,27 @@ class _NewsPageState extends State<NewsPage> {
       stream: _getCombinedNotificationsStream(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+            child: CircularProgressIndicator(color: Color(0xFFC44536)),
+          );
         }
 
         if (snapshot.hasError) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('Lỗi tải thông báo: ${snapshot.error}'),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 60, color: Color(0xFFE74C3C)),
+                  SizedBox(height: 16),
+                  Text(
+                    'Lỗi tải thông báo: ${snapshot.error}',
+                    style: TextStyle(color: Color(0xFF7F8C8D)),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -93,12 +128,12 @@ class _NewsPageState extends State<NewsPage> {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.notifications_off, size: 56, color: Colors.grey),
-                SizedBox(height: 12),
+              children: [
+                Icon(Icons.notifications_off, size: 60, color: Color(0xFFBDC3C7)),
+                SizedBox(height: 16),
                 Text(
                   'Không có thông báo',
-                  style: TextStyle(fontSize: 16, color: Colors.black54),
+                  style: TextStyle(fontSize: 16, color: Color(0xFF7F8C8D)),
                 ),
               ],
             ),
@@ -106,9 +141,9 @@ class _NewsPageState extends State<NewsPage> {
         }
 
         return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
           itemCount: notifications.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 10),
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (context, i) {
             final notif = notifications[i];
             return _NotifTile(
@@ -227,12 +262,19 @@ class _NewsPageState extends State<NewsPage> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đã đánh dấu đã đọc tất cả')),
+        SnackBar(
+          content: Text('Đã đánh dấu đã đọc tất cả'),
+          backgroundColor: Color(0xFF2E8B57),
+          duration: Duration(seconds: 2),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e')),
+        SnackBar(
+          content: Text('Lỗi: $e'),
+          backgroundColor: Color(0xFFE74C3C),
+        ),
       );
     }
   }
@@ -260,8 +302,13 @@ class _NewsPageState extends State<NewsPage> {
               Row(
                 children: [
                   CircleAvatar(
+                    backgroundColor: notification.isPublic
+                        ? Color(0xFF3498DB).withOpacity(0.1)
+                        : Color(0xFFC44536).withOpacity(0.1),
                     child: Icon(
                       notification.isPublic ? Icons.campaign : Icons.person,
+                      color: notification.isPublic ? Color(0xFF3498DB) : Color(0xFFC44536),
+                      size: 20,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -271,16 +318,17 @@ class _NewsPageState extends State<NewsPage> {
                       children: [
                         Text(
                           notification.tieuDe,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
+                            color: Color(0xFF2C3E50),
                           ),
                         ),
                         Text(
                           notification.isPublic ? 'Thông báo chung' : 'Thông báo cá nhân',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Colors.black54,
+                            color: Color(0xFF7F8C8D),
                           ),
                         ),
                       ],
@@ -288,7 +336,7 @@ class _NewsPageState extends State<NewsPage> {
                   ),
                   Text(
                     _fmtTime(notification.ngayTao),
-                    style: const TextStyle(color: Colors.black54, fontSize: 12),
+                    style: TextStyle(color: Color(0xFF7F8C8D), fontSize: 12),
                   ),
                 ],
               ),
@@ -313,7 +361,7 @@ class _NewsPageState extends State<NewsPage> {
                 child: SingleChildScrollView(
                   child: Text(
                     notification.noiDung,
-                    style: const TextStyle(fontSize: 14),
+                    style: TextStyle(fontSize: 14, color: Color(0xFF2C3E50)),
                   ),
                 ),
               ),
@@ -324,6 +372,10 @@ class _NewsPageState extends State<NewsPage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFFC44536),
+                      foregroundColor: Colors.white,
+                    ),
                     onPressed: () => _launchUrl(notification.urlWeb),
                     icon: const Icon(Icons.open_in_new),
                     label: const Text('Mở liên kết'),
@@ -346,7 +398,10 @@ class _NewsPageState extends State<NewsPage> {
     } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Không thể mở liên kết')),
+        SnackBar(
+          content: Text('Không thể mở liên kết'),
+          backgroundColor: Color(0xFFE74C3C),
+        ),
       );
     }
   }
@@ -400,104 +455,116 @@ class _NotifTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dotColor = !notification.isPublic && !notification.daXem
-        ? Colors.green
+        ? Color(0xFFC44536)
         : Colors.transparent;
 
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      elevation: 1,
-      child: InkWell(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Avatar/icon
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: notification.isPublic
-                    ? Colors.blue.shade100
-                    : Colors.green.shade100,
-                child: Icon(
-                  notification.isPublic ? Icons.campaign : Icons.notifications,
-                  color: notification.isPublic ? Colors.blue : Colors.green,
-                  size: 20,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Avatar/icon
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: notification.isPublic
+                      ? Color(0xFF3498DB).withOpacity(0.1)
+                      : Color(0xFFC44536).withOpacity(0.1),
+                  child: Icon(
+                    notification.isPublic ? Icons.campaign : Icons.notifications,
+                    color: notification.isPublic ? Color(0xFF3498DB) : Color(0xFFC44536),
+                    size: 20,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
+                const SizedBox(width: 12),
 
-              // Nội dung
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            notification.tieuDe,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
+                // Nội dung
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              notification.tieuDe,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF2C3E50),
+                              ),
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _fmtTime(notification.ngayTao),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF7F8C8D),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: dotColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+
+                      // Badge loại thông báo
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: notification.isPublic
+                              ? Color(0xFF3498DB).withOpacity(0.1)
+                              : Color(0xFFC44536).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _fmtTime(notification.ngayTao),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.black54,
+                        child: Text(
+                          notification.isPublic ? 'Thông báo chung' : 'Cá nhân',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: notification.isPublic ? Color(0xFF3498DB) : Color(0xFFC44536),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
-                            color: dotColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-
-                    // Badge loại thông báo
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: notification.isPublic
-                            ? Colors.blue.shade50
-                            : Colors.green.shade50,
-                        borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(
-                        notification.isPublic ? 'Thông báo chung' : 'Cá nhân',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: notification.isPublic ? Colors.blue : Colors.green,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
+                      const SizedBox(height: 6),
 
-                    Text(
-                      notification.noiDung,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.black87, fontSize: 14),
-                    ),
-                  ],
+                      Text(
+                        notification.noiDung,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Color(0xFF2C3E50), fontSize: 14),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

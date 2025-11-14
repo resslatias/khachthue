@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
 import 'package:khachthue/subpage/sub_in_home/sub_coso_datsan/thanhtoan.dart';
 
 class BeforPage extends StatefulWidget {
@@ -79,7 +78,7 @@ class _BeforPageState extends State<BeforPage> {
 
   @override
   Widget build(BuildContext context) {
-    final user = _auth.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       return Scaffold(
