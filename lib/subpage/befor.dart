@@ -114,6 +114,7 @@ class _BeforPageViewState extends State<_BeforPageView> {
         children: [
           // Header
           Container(
+            margin: const EdgeInsets.only(top: 10),
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             child: Row(
               children: [
