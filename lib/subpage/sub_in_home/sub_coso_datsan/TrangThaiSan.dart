@@ -32,6 +32,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
   StreamSubscription<QuerySnapshot>? subscription;
   Timer? _rollbackTimer;
   bool isLoading = true;
+  bool isProcessingPayment = false; // ✅ THÊM BIẾN NÀY
 
   String formatDate(DateTime date) => DateFormat('dd_MM_yyyy').format(date);
   String displayDate(DateTime date) => DateFormat('dd/MM/yyyy').format(date);
@@ -54,11 +55,11 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
   Color getStatusColor(int status) {
     switch (status) {
       case 2:
-        return Colors.orange.shade400;
+        return Color(0xFFF39C12); // Orange
       case 3:
-        return Colors.red.shade400;
+        return Color(0xFFC44536); // Primary red
       default:
-        return Colors.green.shade300;
+        return Color(0xFF2E8B57); // Green
     }
   }
 
@@ -91,9 +92,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     final gioDong = int.tryParse((widget.coSoData['gio_dong_cua'] as String?)?.split(':')[0] ?? '22') ?? 22;
     hours = List.generate(gioDong - gioMo, (i) => gioMo + i);
 
-    // 🆕 THÊM DÒNG NÀY: DỌN DẸP KHI VÀO TRANG
     await _cleanupAllExpiredCourts();
-
     await ensureDayDataExists(formatDate(selectedDate));
     setupListeners();
 
@@ -138,10 +137,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         .collection(dayPath)
         .snapshots()
         .listen((snapshot) {
-      // 🆕 THÊM DÒNG NÀY: DỌN DẸP REAL-TIME MỖI KHI CÓ DATA THAY ĐỔI
       _checkAndResetTimeouts(snapshot);
-      // 🆕 (TÙY CHỌN) Có thể thêm dọn dẹp toàn diện nếu cần
-      // _cleanupAllExpiredCourts();
 
       states.clear();
       for (var doc in snapshot.docs) {
@@ -160,8 +156,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     });
   }
 
-  // QUAN TRỌNG: Hàm kiểm tra và reset timeouts
-  // SỬA: Chỉ reset trạng thái 2, không reset trạng thái 3
   Future<void> _checkAndResetTimeouts(QuerySnapshot snapshot) async {
     final now = DateTime.now();
 
@@ -175,7 +169,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
 
         int currentStatus = data[sanKey] ?? 1;
 
-        // 🆕 XỬ LÝ TRẠNG THÁI 2: Kiểm tra temp_timeup
         if (currentStatus == 2 && data[tempTimeupKey] != null) {
           Timestamp tempTimeup = data[tempTimeupKey] as Timestamp;
           if (tempTimeup.toDate().isBefore(now)) {
@@ -191,12 +184,10 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
           }
         }
 
-        // 🆕 XỬ LÝ TRẠNG THÁI 3: Kiểm tra payment_timeup (thời gian kết thúc sân)
         if (currentStatus == 3 && data[paymentTimeupKey] != null) {
           Timestamp paymentTimeup = data[paymentTimeupKey] as Timestamp;
           if (paymentTimeup.toDate().isBefore(now)) {
             try {
-              // Reset về 1 nhưng GIỮ NGUYÊN payment_timeup (lịch sử)
               await doc.reference.update({
                 sanKey: 1,
               });
@@ -210,13 +201,12 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     }
   }
 
-  // QUAN TRỌNG: Hàm đặt sân với timeup management
   Future<void> datSan(int hour, int index) async {
     String datePath = formatDate(selectedDate);
     String hourPath = "${hour.toString().padLeft(2, '0')}:00";
     String sanKey = "san${index + 1}";
-    String tempTimeupKey = "${sanKey}_temp_timeup"; // 🆕 Timeup cho trạng thái 2
-    String paymentTimeupKey = "${sanKey}_payment_timeup"; // 🆕 Timeup cho trạng thái 3
+    String tempTimeupKey = "${sanKey}_temp_timeup";
+    String paymentTimeupKey = "${sanKey}_payment_timeup";
 
     final ref = firestore
         .collection("dat_san")
@@ -229,58 +219,49 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       Map<String, dynamic> data = docSnapshot.data() ?? {};
       int current = data[sanKey] ?? 1;
 
-      // 🔄 XỬ LÝ TRẠNG THÁI 3: Reset nếu hết hạn
       if (current == 3 && data[paymentTimeupKey] != null) {
         Timestamp paymentTimeup = data[paymentTimeupKey] as Timestamp;
         if (paymentTimeup.toDate().isBefore(DateTime.now())) {
-          // 3 → 1, GIỮ NGUYÊN payment_timeup (không xóa)
           await ref.update({sanKey: 1});
           current = 1;
           debugPrint("✅ Đã reset sân $sanKey (3→1) - giữ payment_timeup");
         }
       }
 
-      // 🔄 XỬ LÝ TRẠNG THÁI 2: Reset nếu hết hạn
       if (current == 2 && data[tempTimeupKey] != null) {
         Timestamp tempTimeup = data[tempTimeupKey] as Timestamp;
         if (tempTimeup.toDate().isBefore(DateTime.now())) {
-          // 2 → 1, XÓA temp_timeup
           await ref.update({sanKey: 1, tempTimeupKey: null});
           current = 1;
           debugPrint("✅ Đã reset sân $sanKey (2→1) - xóa temp_timeup");
         }
       }
 
-      // ❌ TRẠNG THÁI 3: Đã đặt - không thể chọn
       if (current == 3) {
-        _showSnackBar('Sân này đã được đặt', Colors.red);
+        _showSnackBar('Sân này đã được đặt', Color(0xFFC44536));
         return;
       }
 
-      // 🔄 TRẠNG THÁI 2: Đang được chọn
       if (current == 2) {
         bool isMyPending = pendingChanges.any(
                 (p) => p['hour'] == hour && p['san'] == index
         );
 
         if (isMyPending) {
-          // Hủy chọn sân của chính mình: 2 → 1 + xóa temp_timeup
           await ref.update({sanKey: 1, tempTimeupKey: null});
           pendingChanges.removeWhere(
                   (p) => p['hour'] == hour && p['san'] == index
           );
         } else {
-          _showSnackBar('Sân này vừa được chọn bởi người khác', Colors.orange);
+          _showSnackBar('Sân này vừa được chọn bởi người khác', Color(0xFFF39C12));
           return;
         }
       }
-      // ✅ TRẠNG THÁI 1: Trống - có thể đặt
       else if (current == 1) {
-        // Đặt trạng thái 2 với temp_timeup 5 phút
         DateTime fiveMinutesFromNow = DateTime.now().add(const Duration(minutes: 5));
         await ref.update({
           sanKey: 2,
-          tempTimeupKey: Timestamp.fromDate(fiveMinutesFromNow), // 🆕 Tạo temp_timeup
+          tempTimeupKey: Timestamp.fromDate(fiveMinutesFromNow),
         });
 
         pendingChanges.add({
@@ -288,14 +269,13 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
           'san': index,
           'ref': ref,
           'sanKey': sanKey,
-          'tempTimeupKey': tempTimeupKey, // 🆕
-          'paymentTimeupKey': paymentTimeupKey, // 🆕
+          'tempTimeupKey': tempTimeupKey,
+          'paymentTimeupKey': paymentTimeupKey,
         });
       }
 
       setState(() {});
 
-      // ⏰ Quản lý rollback timer
       if (pendingChanges.isEmpty) {
         _rollbackTimer?.cancel();
       } else {
@@ -303,7 +283,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       }
     } catch (e) {
       debugPrint("Lỗi datSan: $e");
-      _showSnackBar("Lỗi đặt sân: $e", Colors.red);
+      _showSnackBar("Lỗi đặt sân: $e", Color(0xFFC44536));
     }
   }
 
@@ -315,7 +295,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     });
   }
 
-  // 🆕 CẬP NHẬT HÀM rollbackPending - CHỈ rollback trạng thái 2
   Future<void> rollbackPending() async {
     if (pendingChanges.isEmpty) return;
 
@@ -326,10 +305,9 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       String tempTimeupKey = p['tempTimeupKey'];
 
       try {
-        // 🎯 QUAN TRỌNG: Chỉ rollback trạng thái 2 → 1 và xóa temp_timeup
         await (p['ref'] as DocumentReference).update({
           sanKey: 1,
-          tempTimeupKey: null, // Xóa temp_timeup
+          tempTimeupKey: null,
         });
         debugPrint("✅ Đã rollback $sanKey: 2→1, xóa temp_timeup");
       } catch (e) {
@@ -347,6 +325,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: const Text("Chưa chọn sân"),
           content: const Text("Vui lòng chọn ít nhất một sân trước khi xác nhận."),
           actions: [
@@ -363,7 +342,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     bool hasConflict = false;
     List<Map<String, dynamic>> validChanges = [];
 
-    // 🔍 KIỂM TRA TRẠNG THÁI SÂN TRƯỚC KHI XÁC NHẬN
     for (var p in pendingChanges) {
       String datePath = formatDate(selectedDate);
       String hourPath = "${(p['hour'] as int).toString().padLeft(2, '0')}:00";
@@ -379,7 +357,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         Map<String, dynamic> data = docSnapshot.data() as Map<String, dynamic>;
         int current = data[p['sanKey']] ?? 1;
 
-        // 🚫 CHỈ KIỂM TRA TRẠNG THÁI, KHÔNG KIỂM TRA TIMEOUT
         if (current == 3) {
           hasConflict = true;
           debugPrint("❌ Conflict: ${p['sanKey']} đã là trạng thái 3");
@@ -392,21 +369,18 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       }
     }
 
-    // ❌ XỬ LÝ CONFLICT
     if (hasConflict) {
-      _showSnackBar('Một số sân đã được đặt. Vui lòng chọn lại.', Colors.red);
+      _showSnackBar('Một số sân đã được đặt. Vui lòng chọn lại.', Color(0xFFC44536));
       await rollbackPending();
       setState(() {});
       return;
     }
 
-    // ❌ KHÔNG CÓ SÂN HỢP LỆ
     if (validChanges.isEmpty) {
-      _showSnackBar('Không có sân hợp lệ để đặt', Colors.red);
+      _showSnackBar('Không có sân hợp lệ để đặt', Color(0xFFC44536));
       return;
     }
 
-    // 💰 TÍNH TỔNG TIỀN
     int tongTien = 0;
     for (var p in validChanges) {
       tongTien += getPriceForHour(p['hour']);
@@ -420,15 +394,14 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     TextEditingController nameController = TextEditingController();
     TextEditingController phoneController = TextEditingController();
 
-    // 📝 DIALOG XÁC NHẬN THÔNG TIN
     bool? confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Row(
           children: [
-            Icon(Icons.sports_tennis, color: Colors.green.shade700),
+            Icon(Icons.sports_tennis, color: Color(0xFFC44536)),
             const SizedBox(width: 8),
             const Text("Xác nhận đặt sân"),
           ],
@@ -441,9 +414,9 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.blue.shade200),
+                  color: Color(0xFFC44536).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Color(0xFFC44536).withOpacity(0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,7 +435,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
                       "Danh sách đặt:",
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.green.shade700,
+                        color: Color(0xFFC44536),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -483,7 +456,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
-                            color: Colors.red.shade700,
+                            color: Color(0xFFC44536),
                           ),
                         ),
                       ],
@@ -496,7 +469,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
                 controller: nameController,
                 decoration: InputDecoration(
                   labelText: "Tên người đặt *",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   prefixIcon: const Icon(Icons.person),
                 ),
               ),
@@ -505,7 +478,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
                 controller: phoneController,
                 decoration: InputDecoration(
                   labelText: "Số điện thoại *",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   prefixIcon: const Icon(Icons.phone),
                   hintText: "0xxxxxxxxx",
                 ),
@@ -526,19 +499,19 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
               String phone = phoneController.text.trim();
 
               if (name.isEmpty) {
-                _showSnackBar("Vui lòng nhập tên người đặt", Colors.orange);
+                _showSnackBar("Vui lòng nhập tên người đặt", Color(0xFFF39C12));
                 return;
               }
 
               if (phone.isEmpty) {
-                _showSnackBar("Vui lòng nhập số điện thoại", Colors.orange);
+                _showSnackBar("Vui lòng nhập số điện thoại", Color(0xFFF39C12));
                 return;
               }
 
               if (!RegExp(r'^(03|05|07|08|09)\d{8}$').hasMatch(phone)) {
                 _showSnackBar(
                   "Số điện thoại không hợp lệ. Vui lòng nhập số di động 10 số (03x, 05x, 07x, 08x, 09x)",
-                  Colors.orange,
+                  Color(0xFFF39C12),
                 );
                 return;
               }
@@ -546,9 +519,9 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
               Navigator.pop(context, true);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade700,
+              backgroundColor: Color(0xFFC44536),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
             child: const Text("Xác nhận", style: TextStyle(color: Colors.white)),
@@ -557,23 +530,28 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       ),
     );
 
-    // 🚀 XỬ LÝ KẾT QUẢ XÁC NHẬN
+    // ✅ BẮT ĐẦU XỬ LÝ THANH TOÁN
     if (confirmed == true) {
+      setState(() => isProcessingPayment = true);
+
       await _processBooking(
         nameController.text.trim(),
         phoneController.text.trim(),
         validChanges,
         tongTien,
       );
+
+      if (mounted) {
+        setState(() => isProcessingPayment = false);
+      }
     } else {
-      await rollbackPending(); // CHỈ rollback trạng thái 2
+      await rollbackPending();
     }
 
     pendingChanges.clear();
     setState(() {});
   }
 
-  // QUAN TRỌNG: Hàm xử lý đặt sân - giữ nguyên timeup
   Future<void> _processBooking(
       String name,
       String phone,
@@ -582,37 +560,31 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       ) async {
     if (!mounted) return;
 
-    // 🚫 BỎ HIỂN THỊ LOADING DIALOG
-
     try {
       String ngayDat = formatDate(selectedDate);
       String userId = auth.currentUser?.uid ?? 'khachquaduong';
 
-      // 🆔 TẠO MÃ ĐƠN HÀNG DUY NHẤT
       final donDatRef = await firestore.collection('temp_order').add({'temp': true});
       String maDon = donDatRef.id;
       await donDatRef.delete();
 
       debugPrint("✅ Đang xử lý đơn hàng: $maDon");
 
-      // ⏰ TÍNH THỜI GIAN TIMEOUT CHO THANH TOÁN (15 phút)
       DateTime timeoutTime = DateTime.now().add(const Duration(minutes: 15));
       Timestamp timeoutTimestamp = Timestamp.fromDate(timeoutTime);
 
       List<Map<String, dynamic>> danhSachDat = [];
 
-      // 🔄 CẬP NHẬT TRẠNG THÁI SÂN: 2 → 3
       for (var p in validChanges) {
         String sanKey = p['sanKey'];
         String tempTimeupKey = p['tempTimeupKey'];
         String paymentTimeupKey = p['paymentTimeupKey'];
         String hourPath = "${(p['hour'] as int).toString().padLeft(2, '0')}:00";
 
-        // 🎯 QUAN TRỌNG: Chỉ cập nhật trạng thái, không reset timeup
         await (p['ref'] as DocumentReference).update({
-          sanKey: 3, // 2 → 3
-          tempTimeupKey: null, // 🆕 XÓA temp_timeup
-          paymentTimeupKey: timeoutTimestamp, // 🆕 TẠO payment_timeup mới
+          sanKey: 3,
+          tempTimeupKey: null,
+          paymentTimeupKey: timeoutTimestamp,
         });
 
         debugPrint("✅ Đã cập nhật ${p['sanKey']}: 2→3");
@@ -627,7 +599,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       final orderHash = OrderHashHelper.generateHash(userId, maDon);
       debugPrint("✅ Order hash: $orderHash");
 
-      // ⭐ LƯU LOOKUP (mapping hash → userId + maDon)
       await firestore.collection('order_lookup').doc(orderHash).set({
         'user_id': userId,
         'ma_don': maDon,
@@ -636,10 +607,8 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       });
       debugPrint("✅ Đã lưu order_lookup/$orderHash");
 
-
       debugPrint("✅ Đã update trạng thái sân");
 
-      // 💾 LƯU ĐƠN HÀNG VÀO LỊCH SỬ KHÁCH
       Map<String, dynamic> donDatDataKhach = {
         'ma_don': maDon,
         'co_so_id': widget.coSoId,
@@ -664,7 +633,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
 
       debugPrint("✅ Đã lưu vào lich_su_khach");
 
-      // 💾 LƯU ĐƠN HÀNG VÀO LỊCH SỬ SÂN
       Map<String, dynamic> donDatDataSan = {
         'ma_don': maDon,
         'user_id_dat': userId,
@@ -688,7 +656,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
 
       debugPrint("✅ Đã lưu vào lich_su_san");
 
-      // 💾 LƯU CHI TIẾT ĐẶT SÂN
       WriteBatch batch = firestore.batch();
       for (var detail in danhSachDat) {
         final detailRef = firestore
@@ -702,7 +669,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
 
       debugPrint("✅ Đã lưu chi tiết đặt");
 
-      // 🔔 TẠO THÔNG BÁO
       String danhSachSan = validChanges
           .map((p) => "Sân ${p['san'] + 1} lúc ${p['hour']}-${p['hour'] + 1}h")
           .join(", ");
@@ -720,14 +686,12 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         'ngay_tao': FieldValue.serverTimestamp(),
       });
 
-      // 🎉 HOÀN TẤT - DỌN DẸP
       _rollbackTimer?.cancel();
 
       if (mounted) {
-        _showSnackBar('Đặt sân thành công!', Colors.green);
+        _showSnackBar('Đặt sân thành công!', Color(0xFF2E8B57));
       }
 
-      // 🚀 CHUYỂN TRANG THANH TOÁN NGAY - KHÔNG DELAY
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
@@ -741,7 +705,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       debugPrint("Stack trace: $stackTrace");
 
       if (mounted) {
-        _showSnackBar("Lỗi xác nhận: $e", Colors.red);
+        _showSnackBar("Lỗi xác nhận: $e", Color(0xFFC44536));
       }
     }
   }
@@ -753,6 +717,8 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
           content: Text(message),
           backgroundColor: color,
           duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
     }
@@ -762,7 +728,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.paused) {
-      // Khi app chuyển sang background, rollback trạng thái 2
       if (pendingChanges.isNotEmpty) {
         debugPrint("🔄 App background - tự động rollback trạng thái 2");
         rollbackPending();
@@ -776,7 +741,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     subscription?.cancel();
     _rollbackTimer?.cancel();
 
-    // 🆕 Khi dispose, rollback trạng thái 2 (an toàn)
     if (pendingChanges.isNotEmpty) {
       debugPrint("🔄 Dispose - tự động rollback trạng thái 2");
       rollbackPending();
@@ -788,70 +752,109 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
   Widget build(BuildContext context) {
     if (isLoading) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text("Trạng thái sân"),
-          backgroundColor: Colors.green.shade700,
+        body: Column(
+          children: [
+            _buildCustomAppBar(),
+            Expanded(
+              child: Center(
+                child: CircularProgressIndicator(color: Color(0xFFC44536)),
+              ),
+            ),
+          ],
         ),
-        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
-    // 🆕 THÊM WILLPOP SCOPE ĐỂ BẮT SỰ KIỆN BACK
     return WillPopScope(
       onWillPop: () async {
         await _handleBackPressed();
-        return true; // Cho phép back sau khi xử lý xong
+        return true;
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            widget.coSoData['ten'] as String? ?? "Trạng thái sân",
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          backgroundColor: Colors.green.shade700,
-          elevation: 0,
-        ),
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Colors.green.shade700, Colors.green.shade50],
-              stops: const [0.0, 0.2],
-            ),
-          ),
-          child: Column(
-            children: [
-              _buildDateSelector(),
-              Expanded(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(8),
-                      topRight: Radius.circular(8),
+        backgroundColor: Color(0xFFECF0F1),
+        body: Column(
+          children: [
+            _buildCustomAppBar(),
+            _buildDateSelector(),
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
-                  ),
-                  child: Column(
-                    children: [
-                      _buildLegend(),
-                      Expanded(child: _buildCourtTable()),
-                      _buildBottomBar(),
-                    ],
-                  ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildLegend(),
+                    const SizedBox(height: 8),
+                    Expanded(child: _buildCourtTable()),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+            _buildBottomBar(),
+          ],
         ),
       ),
     );
   }
 
+  // ✅ HEADER ĐÃ GIẢM PADDING
+  Widget _buildCustomAppBar() {
+    return Container(
+      padding: EdgeInsets.only(
+        top: 8,
+        bottom: 8,
+        left: 8,
+        right: 8,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            icon: Icon(Icons.arrow_back, color: Color(0xFF2C3E50)),
+            onPressed: () => _handleBackPressed().then((_) {
+              if (pendingChanges.isEmpty) Navigator.pop(context);
+            }),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              widget.coSoData['ten'] as String? ?? "Trạng thái sân",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2C3E50),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ DATE SELECTOR ĐÃ GIẢM PADDING
   Widget _buildDateSelector() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: InkWell(
         onTap: () async {
           DateTime today = DateTime.now();
@@ -864,7 +867,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
               return Theme(
                 data: Theme.of(context).copyWith(
                   colorScheme: ColorScheme.light(
-                    primary: Colors.green.shade700,
+                    primary: Color(0xFFC44536),
                   ),
                 ),
                 child: child!,
@@ -883,36 +886,30 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
             await ensureDayDataExists(formatDate(picked));
             setupListeners();
             setState(() => isLoading = false);
-            _showSnackBar('Đã chuyển sang ngày ${displayDate(picked)}. Hãy chọn lại sân.', Colors.blue);
+            _showSnackBar('Đã chuyển sang ngày ${displayDate(picked)}. Hãy chọn lại sân.', Color(0xFF3498DB));
           }
         },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(6),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Color(0xFFBDC3C7)),
           ),
           child: Row(
             children: [
-              Icon(Icons.calendar_today, color: Colors.green.shade700, size: 20),
+              Icon(Icons.calendar_today, color: Color(0xFFC44536), size: 20),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   displayDate(selectedDate),
                   style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
-              Icon(Icons.arrow_drop_down, color: Colors.green.shade700),
+              Icon(Icons.arrow_drop_down, color: Color(0xFFC44536)),
             ],
           ),
         ),
@@ -926,9 +923,9 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          _LegendItem(color: Colors.green.shade300, text: "Trống"),
-          _LegendItem(color: Colors.orange.shade400, text: "Đang chọn"),
-          _LegendItem(color: Colors.red.shade400, text: "Đã đặt"),
+          _LegendItem(color: Color(0xFF2E8B57), text: "Trống"),
+          _LegendItem(color: Color(0xFFF39C12), text: "Đang chọn"),
+          _LegendItem(color: Color(0xFFC44536), text: "Đã đặt"),
         ],
       ),
     );
@@ -941,18 +938,11 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
           children: [
             Container(
               decoration: BoxDecoration(
-                color: Colors.green.shade600,
+                color: Color(0xFF2C3E50),
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(6),
-                  topRight: Radius.circular(6),
+                  topLeft: Radius.circular(8),
+                  topRight: Radius.circular(8),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
               ),
               child: Row(
                 children: [
@@ -973,14 +963,8 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
                       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        borderRadius: BorderRadius.circular(4),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 3,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Color(0xFFECF0F1)),
                       ),
                       child: Row(
                         children: [
@@ -995,13 +979,18 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
                                   margin: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
                                     color: past
-                                        ? Colors.grey.shade400
+                                        ? Colors.grey.shade300
                                         : getStatusColor(sanStates[i]),
-                                    borderRadius: BorderRadius.circular(4),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: past
+                                          ? Colors.grey.shade400
+                                          : getStatusColor(sanStates[i]).withOpacity(0.3),
+                                    ),
                                   ),
                                   alignment: Alignment.center,
                                   child: past
-                                      ? const Icon(Icons.block, color: Colors.white70)
+                                      ? Icon(Icons.block, color: Colors.white70, size: 16)
                                       : Text(
                                     sanStates[i] == 3
                                         ? '✓'
@@ -1011,8 +1000,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
                                           ? Colors.white
                                           : Colors.black87,
                                       fontWeight: FontWeight.bold,
-                                      fontSize:
-                                      sanStates[i] == 3 ? 20 : 16,
+                                      fontSize: sanStates[i] == 3 ? 18 : 14,
                                     ),
                                   ),
                                 ),
@@ -1037,17 +1025,12 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         alignment: Alignment.center,
-        decoration: BoxDecoration(
-          border: Border(
-            right: BorderSide(color: Colors.white.withOpacity(0.3)),
-          ),
-        ),
         child: Text(
           title,
           style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 15,
+            fontSize: 14,
           ),
         ),
       ),
@@ -1063,15 +1046,16 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         child: Text(
           getHourLabel(hour),
           style: const TextStyle(
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
-            color: Colors.black87,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            color: Color(0xFF2C3E50),
           ),
         ),
       ),
     );
   }
 
+  // ✅ BOTTOM BAR ĐÃ TỐI ƯU - SÁT BOTTOM NAVIGATION & VÔ HIỆU HÓA KHI PROCESSING
   Widget _buildBottomBar() {
     int tongTien = 0;
     for (var p in pendingChanges) {
@@ -1079,16 +1063,12 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        border: Border(
+          top: BorderSide(color: Color(0xFFECF0F1)),
+        ),
       ),
       child: SafeArea(
         child: Column(
@@ -1096,12 +1076,12 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
           children: [
             if (pendingChanges.isNotEmpty)
               Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(10),
+                margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.blue.shade200),
+                  color: Color(0xFFC44536).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Color(0xFFC44536).withOpacity(0.3)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1111,44 +1091,77 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
                       children: [
                         Text(
                           'Đã chọn: ${pendingChanges.length} sân',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2C3E50),
+                            fontSize: 13,
+                          ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           'Tạm tính: ${_formatCurrency(tongTien)}đ',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Colors.red.shade700,
+                            color: Color(0xFFC44536),
                           ),
                         ),
                       ],
                     ),
                     TextButton.icon(
-                      onPressed: () async {
+                      onPressed: isProcessingPayment ? null : () async {
                         await rollbackPending();
                         setState(() {});
-                        _showSnackBar('Đã hủy chọn', Colors.grey);
+                        _showSnackBar('Đã hủy chọn', Color(0xFF7F8C8D));
                       },
-                      icon: const Icon(Icons.clear),
-                      label: const Text('Hủy chọn'),
+                      icon: Icon(Icons.clear, size: 16),
+                      label: Text('Hủy chọn', style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Color(0xFFC44536),
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      ),
                     ),
                   ],
                 ),
               ),
             SizedBox(
               width: double.infinity,
-              height: 50,
+              height: 48,
               child: ElevatedButton(
-                onPressed: confirmAll,
+                onPressed: isProcessingPayment ? null : confirmAll,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
+                  backgroundColor: isProcessingPayment
+                      ? Colors.grey
+                      : Color(0xFFC44536),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  elevation: 3,
+                  elevation: 2,
                 ),
-                child: Text(
+                child: isProcessingPayment
+                    ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Đợi 1 chút để tới trang thanh toán...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                )
+                    : Text(
                   pendingChanges.isEmpty ? 'Chọn sân để đặt' : 'Xác nhận đặt sân',
                   style: const TextStyle(
                     fontSize: 16,
@@ -1164,13 +1177,12 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     );
   }
 
-  // 🆕 HÀM XỬ LÝ KHI NGƯỜI DÙNG NHẤN BACK
   Future<void> _handleBackPressed() async {
     if (pendingChanges.isNotEmpty) {
-      // Hiển thị dialog xác nhận
       bool? shouldBack = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: const Text("Hủy đặt sân?"),
           content: Text(
             "Bạn có ${pendingChanges.length} sân đang chọn. Bạn có muốn hủy và thoát không?",
@@ -1183,7 +1195,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
             TextButton(
               onPressed: () => Navigator.pop(context, true),
               style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
+                foregroundColor: Color(0xFFC44536),
               ),
               child: const Text("Hủy và thoát"),
             ),
@@ -1192,15 +1204,14 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       );
 
       if (shouldBack == true) {
-        await rollbackPending(); // Rollback trạng thái 2
-        _showSnackBar('Đã hủy ${pendingChanges.length} sân đang chọn', Colors.orange);
+        await rollbackPending();
+        _showSnackBar('Đã hủy ${pendingChanges.length} sân đang chọn', Color(0xFFF39C12));
       } else {
-        return; // Ở lại trang, không cho back
+        return;
       }
     }
   }
 
-  // 🆕 HÀM DỌN DẸP TOÀN DIỆN KHI VÀO TRANG
   Future<void> _cleanupAllExpiredCourts() async {
     try {
       debugPrint("🔄 Đang dọn dẹp toàn bộ sân hết hạn...");
@@ -1208,7 +1219,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       final now = DateTime.now();
       final today = formatDate(DateTime.now());
 
-      // Dọn dẹp cho ngày hiện tại
       final todayRef = firestore
           .collection("dat_san")
           .doc(widget.coSoId)
@@ -1229,7 +1239,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
 
           int currentStatus = data[sanKey] ?? 1;
 
-          // 🧹 DỌN DẸP TRẠNG THÁI 2 HẾT HẠN
           if (currentStatus == 2 && data[tempTimeupKey] != null) {
             Timestamp tempTimeup = data[tempTimeupKey] as Timestamp;
             if (tempTimeup.toDate().isBefore(now)) {
@@ -1240,12 +1249,10 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
             }
           }
 
-          // 🧹 DỌN DẸP TRẠNG THÁI 3 HẾT HẠN
           if (currentStatus == 3 && data[paymentTimeupKey] != null) {
             Timestamp paymentTimeup = data[paymentTimeupKey] as Timestamp;
             if (paymentTimeup.toDate().isBefore(now)) {
               updates[sanKey] = 1;
-              // Giữ nguyên payment_timeup
               cleanupCount++;
               debugPrint("✅ Đã dọn dẹp $sanKey (3→1) - payment_timeup hết hạn");
             }
@@ -1269,8 +1276,6 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
   }
 }
 
-
-
 class _LegendItem extends StatelessWidget {
   final Color color;
   final String text;
@@ -1282,8 +1287,8 @@ class _LegendItem extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 20,
-          height: 20,
+          width: 16,
+          height: 16,
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(4),
@@ -1294,7 +1299,7 @@ class _LegendItem extends StatelessWidget {
         Text(
           text,
           style: const TextStyle(
-            fontSize: 13,
+            fontSize: 12,
             fontWeight: FontWeight.w500,
           ),
         ),
