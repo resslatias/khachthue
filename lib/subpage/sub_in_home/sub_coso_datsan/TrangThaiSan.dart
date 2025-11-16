@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'OrderHashHelper.dart';
 import 'thanhtoan.dart';
 
 class TrangThaiSan extends StatefulWidget {
@@ -623,6 +624,18 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
           'gia': getPriceForHour(p['hour']),
         });
       }
+      final orderHash = OrderHashHelper.generateHash(userId, maDon);
+      debugPrint("✅ Order hash: $orderHash");
+
+      // ⭐ LƯU LOOKUP (mapping hash → userId + maDon)
+      await firestore.collection('order_lookup').doc(orderHash).set({
+        'user_id': userId,
+        'ma_don': maDon,
+        'created_at': FieldValue.serverTimestamp(),
+        'trang_thai': 'chua_thanh_toan',
+      });
+      debugPrint("✅ Đã lưu order_lookup/$orderHash");
+
 
       debugPrint("✅ Đã update trạng thái sân");
 
@@ -639,6 +652,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         'trang_thai': 'chua_thanh_toan',
         'ngay_dat': ngayDat,
         'timeup': timeoutTimestamp,
+        'order_hash': orderHash,
       };
 
       await firestore

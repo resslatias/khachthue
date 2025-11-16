@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 
+import 'OrderHashHelper.dart';
+
 class ThanhToanPage extends StatefulWidget {
   final String maDon;
 
@@ -125,11 +127,32 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
 
   // 🔗 TẠO URL QR CODE VIETQR
   String _generateQRUrl() {
-    final tongTien = (donDatData!['tong_tien'] as num?)?.toInt() ?? 0;
-    final maDon = widget.maDon;
+    /*final tongTien = (donDatData!['tong_tien'] as num?)?.toInt() ?? 0;
 
-    return 'https://api.vietqr.io/image/970436-9915033623-Y0DjLJG.jpg?amount=$tongTien&addInfo=$maDon';
+    final maDon = widget.maDon;
+    final userId = auth.currentUser?.uid ?? "khachquaduong";
+
+    // Lấy 10 ký tự đầu UID và 10 ký tự đầu mã đơn
+    ///final uidShort = userId.length > 10 ? userId.substring(0, 10) : userId;
+    ///final maDonShort = maDon.length > 10 ? maDon.substring(0, 10) : maDon;
+
+    final addInfo = 'USE${userId}DON${maDon}END';
+
+    return 'https://api.vietqr.io/image/963388-0868089513-bl9RhYA.jpg'
+        '?amount=$tongTien&addInfo=$addInfo';*/
+    final tongTien = (donDatData!['tong_tien'] as num?)?.toInt() ?? 0;
+
+    // Lấy hash từ dữ liệu đơn
+    final orderHash = donDatData!['order_hash'] as String? ?? '';
+
+    // Format addInfo ngắn gọn
+    final addInfo = OrderHashHelper.formatAddInfo(orderHash);
+    // VD: "PAYA7F3E9B2" - chỉ 11 ký tự!
+
+    return 'https://api.vietqr.io/image/963388-0868089513-bl9RhYA.jpg'
+        '?amount=$tongTien&addInfo=$addInfo';
   }
+
 
   String _formatCurrency(int amount) {
     return amount.toString().replaceAllMapped(
