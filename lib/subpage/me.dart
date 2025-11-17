@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:khachthue/subpage/sub_in_me/like.dart';
 import 'package:khachthue/subpage/sub_in_me/profile.dart';
+import 'package:khachthue/subpage/sub_in_me/refund.dart';
 
 class MePage extends StatelessWidget {
   const MePage({super.key});
@@ -96,6 +97,16 @@ class _MePageView extends StatelessWidget {
                 title: 'Bình luận của bạn',
                 subtitle: 'Xem tất cả bình luận đã đăng',
                 onTap: () => _showComingSoon(context),
+              ),
+              _MenuDivider(),
+              _MenuItem(
+                icon: Icons.comment,
+                title: 'Đơn chờ hoàn tiền',
+                subtitle: 'Danh sách yêu cầu hoàn tiền của bạn!',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const refundPage()),
+                ),
               ),
             ],
           ),
