@@ -45,7 +45,6 @@ class _BeforPageViewState extends State<_BeforPageView> {
   @override
   void didUpdateWidget(_BeforPageView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Cập nhật stream khi user thay đổi
     if (oldWidget.user?.uid != widget.user?.uid) {
       setState(() {
         _donDatStream = _getDonDatStream();
@@ -112,7 +111,6 @@ class _BeforPageViewState extends State<_BeforPageView> {
     if (widget.user == null) {
       return Column(
         children: [
-          // Header
           Container(
             margin: const EdgeInsets.only(top: 10),
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -138,7 +136,6 @@ class _BeforPageViewState extends State<_BeforPageView> {
 
     return Column(
       children: [
-        // Header
         Container(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Row(
@@ -249,6 +246,7 @@ class _OrderCard extends StatelessWidget {
     final trangThai = order['trang_thai'] as String? ?? 'chua_thanh_toan';
     final timeup = order['timeup'] as Timestamp?;
 
+    // ✅ Đã thanh toán
     if (trangThai == 'da_thanh_toan') {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -275,6 +273,34 @@ class _OrderCard extends StatelessWidget {
       );
     }
 
+    // ❌ Đã hủy
+    if (trangThai == 'da_huy') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Color(0xFF95A5A6).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Color(0xFF95A5A6)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cancel, color: Color(0xFF95A5A6), size: 16),
+            const SizedBox(width: 4),
+            Text(
+              'Đã hủy',
+              style: TextStyle(
+                color: Color(0xFF95A5A6),
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ⏳ Chưa thanh toán
     if (trangThai == 'chua_thanh_toan') {
       if (timeup != null) {
         final now = DateTime.now();
@@ -548,6 +574,7 @@ class _OrderDetailBottomSheet extends StatefulWidget {
 class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
   List<Map<String, dynamic>> chiTietList = [];
   bool isLoading = true;
+  bool isCancelling = false;
 
   @override
   void initState() {
@@ -591,10 +618,286 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
     }
   }
 
+  /// ✅ KIỂM TRA XEM CÓ THỂ HỦY KHÔNG
+  bool _canCancelOrder() {
+    final trangThai = widget.order['trang_thai'] as String? ?? '';
+
+    // Chỉ đơn "da_thanh_toan" mới được hủy
+    if (trangThai != 'da_thanh_toan') return false;
+
+    // Lấy giờ sớm nhất từ chi tiết đặt
+    if (chiTietList.isEmpty) return false;
+
+    try {
+      // Parse ngày đặt: "17_11_2025" -> DateTime
+      final ngayDat = widget.order['ngay_dat'] as String? ?? '';
+      final dateParts = ngayDat.split('_');
+      final day = int.parse(dateParts[0]);
+      final month = int.parse(dateParts[1]);
+      final year = int.parse(dateParts[2]);
+
+      // Tìm giờ sớm nhất: "08:00", "09:00", "10:00" -> 8
+      int earliestHour = 24;
+      for (var detail in chiTietList) {
+        final gio = detail['gio'] as String? ?? '';
+        final hourStr = gio.split(':')[0];
+        final hour = int.tryParse(hourStr) ?? 24;
+        if (hour < earliestHour) {
+          earliestHour = hour;
+        }
+      }
+
+      if (earliestHour == 24) return false;
+
+      // Tạo DateTime của giờ sân sớm nhất
+      final sanStartTime = DateTime(year, month, day, earliestHour, 0);
+
+      // Kiểm tra: hiện tại + 2 giờ < giờ sân
+      final now = DateTime.now();
+      final twoHoursLater = now.add(Duration(hours: 2));
+
+      return twoHoursLater.isBefore(sanStartTime);
+
+    } catch (e) {
+      debugPrint('Lỗi kiểm tra thời gian hủy: $e');
+      return false;
+    }
+  }
+
+  /// 🔥 XỬ LÝ HỦY ĐƠN
+  Future<void> _handleCancelOrder() async {
+    // Dialog 1: Chính sách hủy
+    final confirmed1 = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: Color(0xFFF39C12), size: 28),
+            SizedBox(width: 12),
+            Text(
+              'Chính sách hủy',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '📌 Điều kiện hủy:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '• Đơn chỉ có thể hủy nếu thời gian còn lại lớn hơn 2 giờ',
+                style: TextStyle(fontSize: 14, height: 1.5),
+              ),
+              SizedBox(height: 16),
+              Text(
+                '⚠️ Lưu ý:',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '• Chúng tôi sẽ hủy vé chơi của bạn ngay lập tức\n'
+                    '• Bạn không thể hủy yêu cầu hủy sau khi xác nhận\n'
+                    '• CSKH sẽ liên hệ và hoàn 80% số tiền cho bạn trong thời gian sớm nhất\n'
+                    '• Bạn có thể xem danh sách đơn hủy ở mục Tài khoản / Chờ hoàn tiền',
+                style: TextStyle(fontSize: 14, height: 1.5),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Quay lại', style: TextStyle(color: Color(0xFF7F8C8D))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFFF39C12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text('Tiếp tục', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed1 != true) return;
+
+    // Dialog 2: Xác nhận lần cuối
+    final confirmed2 = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFE74C3C), size: 28),
+            SizedBox(width: 12),
+            Text(
+              'Xác nhận hủy đơn',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Text(
+          'Bạn chắc chắn muốn hủy đơn này?\n\n'
+              'Hành động này không thể hoàn tác.',
+          style: TextStyle(fontSize: 15, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Không', style: TextStyle(color: Color(0xFF7F8C8D))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFFE74C3C),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text('Xác nhận hủy', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed2 != true) return;
+
+    // ✅ BẮT ĐẦU HỦY ĐƠN
+    setState(() => isCancelling = true);
+
+    try {
+      await _processCancelOrder();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Hủy đơn thành công! CSKH sẽ liên hệ sớm nhất.'),
+            backgroundColor: Color(0xFF2E8B57),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        // Đóng bottom sheet
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi hủy đơn: $e'),
+            backgroundColor: Color(0xFFE74C3C),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isCancelling = false);
+      }
+    }
+  }
+
+  /// 🔥 XỬ LÝ HỦY ĐƠN - CORE LOGIC
+  Future<void> _processCancelOrder() async {
+    final maDon = widget.order['ma_don'] as String? ?? '';
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final coSoId = widget.order['co_so_id'] as String? ?? '';
+    final ngayDat = widget.order['ngay_dat'] as String? ?? '';
+
+    if (maDon.isEmpty || userId.isEmpty || coSoId.isEmpty) {
+      throw Exception('Thiếu thông tin đơn hàng');
+    }
+
+    final firestore = FirebaseFirestore.instance;
+
+    // 1️⃣ Cập nhật lich_su_khach
+    await firestore
+        .collection('lich_su_khach')
+        .doc(userId)
+        .collection('don_dat')
+        .doc(maDon)
+        .update({
+      'trang_thai': 'da_huy',
+      'timeup': null,
+    });
+
+    // 2️⃣ Cập nhật lich_su_san
+    await firestore
+        .collection('lich_su_san')
+        .doc(coSoId)
+        .collection('khach_dat')
+        .doc(maDon)
+        .update({
+      'trang_thai': 'da_huy',
+      'timeup': null,
+    });
+
+    // 3️⃣ Cập nhật dat_san (chuyển từ 3 -> 1)
+    for (var detail in chiTietList) {
+      final maSan = detail['ma_san'] as String? ?? '';
+      final gio = detail['gio'] as String? ?? '';
+
+      if (maSan.isEmpty || gio.isEmpty) continue;
+
+      await firestore
+          .collection('dat_san')
+          .doc(coSoId)
+          .collection(ngayDat)
+          .doc(gio)
+          .update({
+        maSan: 1,
+        '${maSan}_payment_timeup': FieldValue.delete(),
+      });
+    }
+
+    // 4️⃣ Tạo bản ghi cho_hoan_tien
+    await firestore
+        .collection('cho_hoan_tien')
+        .doc(userId)
+        .collection('co_so')
+        .doc(coSoId)
+        .collection('don_dat')
+        .doc(maDon)
+        .set({
+      ...widget.order,
+      'trang_thai': 'da_huy',
+      'da_hoan_tien': false,
+      'time_hoan_tien': null,
+      'phuong_thuc': '',
+      'ngay_yeu_cau_huy': FieldValue.serverTimestamp(),
+    });
+
+    // 5️⃣ Tạo thông báo
+    await firestore
+        .collection('thong_bao')
+        .doc(userId)
+        .collection('notifications')
+        .add({
+      'tieu_de': 'Đơn hàng đã được hủy',
+      'noi_dung': 'Đơn #${maDon.substring(0, 8).toUpperCase()} đã được hủy. CSKH sẽ liên hệ hoàn 80% tiền trong thời gian sớm nhất.',
+      'da_xem_chua': false,
+      'Urlweb': null,
+      'Urlimage': null,
+      'ngay_tao': FieldValue.serverTimestamp(),
+    });
+
+    debugPrint('✅ Đã hủy đơn $maDon thành công');
+  }
+
   Widget _buildStatusWidget() {
     final trangThai = widget.order['trang_thai'] as String? ?? 'chua_thanh_toan';
     final timeup = widget.order['timeup'] as Timestamp?;
 
+    // ✅ Đã thanh toán
     if (trangThai == 'da_thanh_toan') {
       return Row(
         children: [
@@ -612,6 +915,25 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
       );
     }
 
+    // ❌ Đã hủy
+    if (trangThai == 'da_huy') {
+      return Row(
+        children: [
+          Icon(Icons.cancel, color: Color(0xFF95A5A6), size: 20),
+          const SizedBox(width: 8),
+          Text(
+            'Đã hủy',
+            style: TextStyle(
+              color: Color(0xFF95A5A6),
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+        ],
+      );
+    }
+
+    // ⏳ Chưa thanh toán
     if (trangThai == 'chua_thanh_toan') {
       if (timeup != null) {
         final now = DateTime.now();
@@ -688,6 +1010,8 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
     final canPay = trangThai == 'chua_thanh_toan' &&
         timeup != null &&
         timeup.toDate().isAfter(DateTime.now());
+
+    final canCancel = !isLoading && _canCancelOrder();
 
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
@@ -978,6 +1302,48 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
                           ),
                         ),
                       ),
+
+                    // Nút hủy đơn
+                    if (canCancel) ...[
+                      if (canPay) const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: OutlinedButton(
+                          onPressed: isCancelling ? null : _handleCancelOrder,
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Color(0xFFE74C3C), width: 2),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: isCancelling
+                              ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Color(0xFFE74C3C),
+                            ),
+                          )
+                              : Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.cancel, color: Color(0xFFE74C3C)),
+                              SizedBox(width: 8),
+                              Text(
+                                'Hủy đơn hàng',
+                                style: TextStyle(
+                                  color: Color(0xFFE74C3C),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
 
                     const SizedBox(height: 10),
                   ],
