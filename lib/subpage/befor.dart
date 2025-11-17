@@ -860,6 +860,27 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
     }
 
     // 4️⃣ Tạo bản ghi cho_hoan_tien
+
+    await firestore
+        .collection('cho_hoan_tien')
+        .doc(userId)
+        .set({
+      'created_at': FieldValue.serverTimestamp(),
+      'user_id': userId,
+    }, SetOptions(merge: true)); // merge: true để không ghi đè nếu đã tồn tại
+
+    // Tạo document cho co_so với thông tin cơ bản
+    await firestore
+        .collection('cho_hoan_tien')
+        .doc(userId)
+        .collection('co_so')
+        .doc(coSoId)
+        .set({
+      'co_so_id': coSoId,
+      'ten_co_so': widget.order['ten_co_so'] ?? '', // nếu có
+      'created_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
     await firestore
         .collection('cho_hoan_tien')
         .doc(userId)

@@ -67,31 +67,66 @@ class _RefundPageViewState extends State<_RefundPageView> {
     try {
       final userId = widget.user!.uid;
 
-      // ✅ Dùng collectionGroup để query tất cả 'don_dat'
-      final snapshot = await _firestore
-          .collectionGroup('don_dat')
-          .where('user_id', isEqualTo: userId) // Cần thêm field user_id vào đơn
-          .orderBy('ngay_yeu_cau_huy', descending: true)
+      // ✅ Truy vấn theo cấu trúc mới: cho_hoan_tien/{userId}/co_so/{coSoId}/don_dat/{maDon}
+      final coSoSnapshot = await _firestore
+          .collection('cho_hoan_tien')
+          .doc(userId)
+          .collection('co_so')
           .get();
 
-      List<Map<String, dynamic>> allOrders = snapshot.docs.map((doc) {
-        return {
-          ...doc.data(),
-          'doc_id': doc.id,
-        };
-      }).toList();
+      List<Map<String, dynamic>> allOrders = [];
 
-      debugPrint('✅ Tổng: ${allOrders.length} đơn');
+      // Duyệt qua tất cả các cơ sở
+      for (var coSoDoc in coSoSnapshot.docs) {
+        final coSoId = coSoDoc.id;
+        final coSoData = coSoDoc.data();
+
+        // Lấy tất cả đơn hàng trong collection don_dat của mỗi cơ sở
+        final donDatSnapshot = await _firestore
+            .collection('cho_hoan_tien')
+            .doc(userId)
+            .collection('co_so')
+            .doc(coSoId)
+            .collection('don_dat')
+            .orderBy('ngay_yeu_cau_huy', descending: true)
+            .get();
+
+        // Thêm thông tin cơ sở vào mỗi đơn hàng
+        for (var donDatDoc in donDatSnapshot.docs) {
+          var donDatData = donDatDoc.data();
+          allOrders.add({
+            ...donDatData,
+            'doc_id': donDatDoc.id,
+            'co_so_id': coSoId,
+            // Ưu tiên lấy tên cơ sở từ document co_so, nếu không có thì lấy từ đơn hàng
+            'ten_co_so': coSoData['ten_co_so'] ?? donDatData['ten_co_so'] ?? '',
+            // Ưu tiên lấy địa chỉ từ đơn hàng, nếu không có thì lấy từ document co_so
+            'dia_chi_co_so': donDatData['dia_chi_co_so'] ?? coSoData['dia_chi_co_so'] ?? '',
+          });
+        }
+      }
+
+      // Sắp xếp lại toàn bộ danh sách theo thời gian yêu cầu hủy
+      allOrders.sort((a, b) {
+        final Timestamp? aTime = a['ngay_yeu_cau_huy'];
+        final Timestamp? bTime = b['ngay_yeu_cau_huy'];
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return bTime.compareTo(aTime); // descending
+      });
+
+      debugPrint('✅ Tổng: ${allOrders.length} đơn chờ hoàn tiền');
 
       setState(() {
         refundOrders = allOrders;
         isLoading = false;
       });
     } catch (e, stackTrace) {
-      debugPrint('❌ Lỗi: $e');
+      debugPrint('❌ Lỗi khi tải đơn hoàn tiền: $e');
       debugPrint('Stack: $stackTrace');
       setState(() {
-        errorMessage = e.toString();
+        errorMessage = 'Có lỗi xảy ra khi tải danh sách hoàn tiền: ${e.toString()}';
         isLoading = false;
       });
     }
@@ -107,7 +142,10 @@ class _RefundPageViewState extends State<_RefundPageView> {
   String _formatDate(String dateStr) {
     try {
       final parts = dateStr.split('_');
-      return '${parts[0]}/${parts[1]}/${parts[2]}';
+      if (parts.length == 3) {
+        return '${parts[0]}/${parts[1]}/${parts[2]}';
+      }
+      return dateStr;
     } catch (e) {
       return dateStr;
     }
@@ -131,21 +169,37 @@ class _RefundPageViewState extends State<_RefundPageView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFFECF0F1),
-      appBar: AppBar(
+
+      backgroundColor: Color(0xFFF8F9FA),
+      appBar:
+
+      AppBar(
+        toolbarHeight: 28,
+        //primary: false,
         backgroundColor: Colors.white,
-        elevation: 0,
+        elevation: 1,
         leading: IconButton(
+          padding: EdgeInsets.only(top: 8.0),
           icon: Icon(Icons.arrow_back, color: Color(0xFF2C3E50)),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          'Chờ hoàn tiền',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50)),
+
+        title: Padding(
+          padding: EdgeInsets.only(top: 8.0), // Thêm padding top cho title
+          child: Text(
+            'Đơn chờ hoàn tiền',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2C3E50)
+            ),
+          ),
         ),
+
         centerTitle: true,
         actions: [
           IconButton(
+            padding: EdgeInsets.only(top: 8.0),
             icon: Icon(Icons.refresh, color: Color(0xFFC44536)),
             onPressed: _loadRefundOrders,
           ),
@@ -170,9 +224,15 @@ class _RefundPageViewState extends State<_RefundPageView> {
         children: [
           Icon(Icons.person_off, size: 60, color: Color(0xFFBDC3C7)),
           SizedBox(height: 16),
-          Text('Vui lòng đăng nhập', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(
+              'Vui lòng đăng nhập',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50))
+          ),
           SizedBox(height: 8),
-          Text('Đăng nhập để xem đơn chờ hoàn tiền', style: TextStyle(color: Color(0xFF7F8C8D))),
+          Text(
+              'Đăng nhập để xem đơn chờ hoàn tiền',
+              style: TextStyle(color: Color(0xFF7F8C8D))
+          ),
         ],
       ),
     );
@@ -185,11 +245,18 @@ class _RefundPageViewState extends State<_RefundPageView> {
         children: [
           Icon(Icons.error_outline, size: 60, color: Color(0xFFE74C3C)),
           SizedBox(height: 16),
-          Text('Có lỗi xảy ra', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+              'Có lỗi xảy ra',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50))
+          ),
           SizedBox(height: 8),
           Padding(
             padding: EdgeInsets.symmetric(horizontal: 32),
-            child: Text(errorMessage!, textAlign: TextAlign.center, style: TextStyle(color: Color(0xFF7F8C8D))),
+            child: Text(
+                errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Color(0xFF7F8C8D))
+            ),
           ),
           SizedBox(height: 20),
           ElevatedButton(
@@ -197,6 +264,7 @@ class _RefundPageViewState extends State<_RefundPageView> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Color(0xFFC44536),
               foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
             child: Text('Thử lại'),
           ),
@@ -212,9 +280,15 @@ class _RefundPageViewState extends State<_RefundPageView> {
         children: [
           Icon(Icons.receipt_long, size: 60, color: Color(0xFFBDC3C7)),
           SizedBox(height: 16),
-          Text('Chưa có đơn chờ hoàn tiền', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(
+              'Chưa có đơn chờ hoàn tiền',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50))
+          ),
           SizedBox(height: 8),
-          Text('Các đơn đã hủy sẽ hiển thị ở đây', style: TextStyle(color: Color(0xFF7F8C8D))),
+          Text(
+              'Các đơn đã hủy sẽ hiển thị ở đây',
+              style: TextStyle(color: Color(0xFF7F8C8D))
+          ),
         ],
       ),
     );
@@ -255,7 +329,10 @@ class _RefundOrderCard extends StatelessWidget {
   String _formatDate(String dateStr) {
     try {
       final parts = dateStr.split('_');
-      return '${parts[0]}/${parts[1]}/${parts[2]}';
+      if (parts.length == 3) {
+        return '${parts[0]}/${parts[1]}/${parts[2]}';
+      }
+      return dateStr;
     } catch (e) {
       return dateStr;
     }
@@ -269,8 +346,8 @@ class _RefundOrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tenCoSo = order['ten_co_so'] as String? ?? '';
-    final diaChiCoSo = order['dia_chi_co_so'] as String? ?? '';
+    final tenCoSo = order['ten_co_so'] as String? ?? 'Chưa có tên';
+    final diaChiCoSo = order['dia_chi_co_so'] as String? ?? 'Chưa có địa chỉ';
     final maDon = order['ma_don'] as String? ?? '';
     final ngayDat = _formatDate(order['ngay_dat'] as String? ?? '');
     final ngayYeuCauHuy = _formatTimestamp(order['ngay_yeu_cau_huy'] as Timestamp?);
@@ -279,46 +356,74 @@ class _RefundOrderCard extends StatelessWidget {
     final daHoanTien = order['da_hoan_tien'] as bool? ?? false;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: Offset(0, 2)),
+          BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 12,
+              offset: Offset(0, 4)
+          ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
+                // Header với trạng thái
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
-                      child: Text(
-                        tenCoSo,
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tenCoSo,
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 17,
+                                color: Color(0xFF2C3E50)
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            diaChiCoSo,
+                            style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF7F8C8D)
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
+                    SizedBox(width: 12),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color: daHoanTien ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                        color: daHoanTien ? Color(0xFF27AE60).withOpacity(0.1) : Color(0xFFE67E22).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: daHoanTien ? Color(0xFF27AE60) : Color(0xFFE67E22),
+                            width: 1
+                        ),
                       ),
                       child: Text(
-                        daHoanTien ? 'Đã hoàn' : 'Chờ xử lý',
+                        daHoanTien ? 'ĐÃ HOÀN' : 'CHỜ XỬ LÝ',
                         style: TextStyle(
-                          color: daHoanTien ? Colors.green : Colors.orange,
+                          color: daHoanTien ? Color(0xFF27AE60) : Color(0xFFE67E22),
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -326,26 +431,35 @@ class _RefundOrderCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                SizedBox(height: 8),
-                Text(diaChiCoSo, style: TextStyle(fontSize: 13, color: Colors.grey)),
-                Divider(height: 24),
 
-                // Thông tin
+                SizedBox(height: 16),
+                Divider(height: 1, color: Color(0xFFECF0F1)),
+
+                // Thông tin đơn hàng
+                SizedBox(height: 16),
                 Row(
                   children: [
-                    Expanded(child: _buildInfo('Mã đơn', '#${maDon.substring(0, 8).toUpperCase()}')),
-                    Expanded(child: _buildInfo('Ngày đặt', ngayDat)),
-                    Expanded(child: _buildInfo('Ngày hủy', ngayYeuCauHuy)),
+                    Expanded(
+                      child: _buildInfo('Mã đơn', maDon.isNotEmpty ? '#${maDon.substring(0, 8).toUpperCase()}' : '---'),
+                    ),
+                    Expanded(
+                      child: _buildInfo('Ngày đặt', ngayDat.isNotEmpty ? ngayDat : '---'),
+                    ),
+                    Expanded(
+                      child: _buildInfo('Ngày hủy', ngayYeuCauHuy.isNotEmpty ? ngayYeuCauHuy : '---'),
+                    ),
                   ],
                 ),
-                SizedBox(height: 12),
 
-                // Tiền
+                SizedBox(height: 16),
+
+                // Thông tin tiền
                 Container(
-                  padding: EdgeInsets.all(12),
+                  padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Color(0xFFF8F9FA),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Color(0xFFECF0F1)),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -353,22 +467,90 @@ class _RefundOrderCard extends StatelessWidget {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Tổng tiền', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                          Text('${_formatCurrency(tongTien)}đ', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text(
+                              'Tổng tiền',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF7F8C8D),
+                                  fontWeight: FontWeight.w500
+                              )
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                              '${_formatCurrency(tongTien)}đ',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Color(0xFF2C3E50)
+                              )
+                          ),
                         ],
                       ),
-                      Icon(Icons.arrow_forward, size: 16, color: Colors.grey),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Color(0xFFC44536).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(
+                            Icons.arrow_forward,
+                            size: 16,
+                            color: Color(0xFFC44536)
+                        ),
+                      ),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text('Hoàn (80%)', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                          Text('${_formatCurrency(soTienHoan)}đ',
-                              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
+                          Text(
+                              'Hoàn 80%',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF7F8C8D),
+                                  fontWeight: FontWeight.w500
+                              )
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            '${_formatCurrency(soTienHoan)}đ',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Color(0xFFC44536)
+                            ),
+                          ),
                         ],
                       ),
                     ],
                   ),
                 ),
+
+                // Thông báo hỗ trợ
+                if (!daHoanTien) ...[
+                  SizedBox(height: 12),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF3498DB).withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Color(0xFF3498DB).withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 16, color: Color(0xFF3498DB)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'CSKH sẽ liên hệ hoàn 80% tiền trong thời gian sớm nhất',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF3498DB),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -381,9 +563,23 @@ class _RefundOrderCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey)),
-        SizedBox(height: 2),
-        Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+        Text(
+            label,
+            style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF7F8C8D),
+                fontWeight: FontWeight.w500
+            )
+        ),
+        SizedBox(height: 4),
+        Text(
+            value,
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF2C3E50)
+            )
+        ),
       ],
     );
   }
@@ -404,7 +600,10 @@ class _RefundDetailBottomSheet extends StatelessWidget {
   String _formatDate(String dateStr) {
     try {
       final parts = dateStr.split('_');
-      return '${parts[0]}/${parts[1]}/${parts[2]}';
+      if (parts.length == 3) {
+        return '${parts[0]}/${parts[1]}/${parts[2]}';
+      }
+      return dateStr;
     } catch (e) {
       return dateStr;
     }
@@ -421,12 +620,17 @@ class _RefundDetailBottomSheet extends StatelessWidget {
     final daHoanTien = order['da_hoan_tien'] as bool? ?? false;
     final tongTien = (order['tong_tien'] as num?)?.toInt() ?? 0;
     final soTienHoan = (tongTien * 0.8).toInt();
+    final tenCoSo = order['ten_co_so'] as String? ?? 'Chưa có tên';
+    final diaChiCoSo = order['dia_chi_co_so'] as String? ?? 'Chưa có địa chỉ';
+    final maDon = order['ma_don'] as String? ?? '';
+    final tenNguoiDat = order['ten_nguoi_dat'] as String? ?? '';
+    final sdt = order['sdt'] as String? ?? '';
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
+      height: MediaQuery.of(context).size.height * 0.9,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
@@ -436,54 +640,82 @@ class _RefundDetailBottomSheet extends StatelessWidget {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey,
+              color: Colors.grey[300],
               borderRadius: BorderRadius.circular(2),
             ),
           ),
 
           // Header
-          Padding(
-            padding: EdgeInsets.all(16),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: Color(0xFFECF0F1))),
+            ),
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.close),
+                  icon: Icon(Icons.close, color: Color(0xFF7F8C8D)),
                   onPressed: () => Navigator.pop(context),
                 ),
-                Text('Chi tiết hoàn tiền', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                SizedBox(width: 8),
+                Text(
+                    'Chi tiết hoàn tiền',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2C3E50)
+                    )
+                ),
               ],
             ),
           ),
 
-          Divider(height: 1),
-
           // Content
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(16),
+              padding: EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Trạng thái
                   Container(
-                    padding: EdgeInsets.all(16),
+                    width: double.infinity,
+                    padding: EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: daHoanTien ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: daHoanTien ? Color(0xFF27AE60).withOpacity(0.05) : Color(0xFFE67E22).withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: daHoanTien ? Color(0xFF27AE60).withOpacity(0.3) : Color(0xFFE67E22).withOpacity(0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        Icon(daHoanTien ? Icons.check_circle : Icons.hourglass_empty,
-                            color: daHoanTien ? Colors.green : Colors.orange, size: 32),
+                        Icon(
+                            daHoanTien ? Icons.check_circle : Icons.access_time,
+                            color: daHoanTien ? Color(0xFF27AE60) : Color(0xFFE67E22),
+                            size: 32
+                        ),
                         SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(daHoanTien ? 'Đã hoàn tiền' : 'Chờ xử lý',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                              Text(daHoanTien ? 'Đã hoàn vào tài khoản' : 'CSKH sẽ liên hệ sớm',
-                                  style: TextStyle(fontSize: 13, color: Colors.grey)),
+                              Text(
+                                  daHoanTien ? 'Đã hoàn tiền' : 'Chờ xử lý',
+                                  style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.bold,
+                                      color: daHoanTien ? Color(0xFF27AE60) : Color(0xFFE67E22)
+                                  )
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                  daHoanTien ? 'Tiền đã được hoàn vào tài khoản của bạn' : 'CSKH sẽ liên hệ hoàn tiền trong thời gian sớm nhất',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFF7F8C8D)
+                                  )
+                              ),
                             ],
                           ),
                         ),
@@ -493,28 +725,87 @@ class _RefundDetailBottomSheet extends StatelessWidget {
 
                   SizedBox(height: 24),
 
-                  _buildSection('Thông tin đơn hàng', [
-                    _buildRow('Mã đơn', '#${order['ma_don']}'),
-                    _buildRow('Tên cơ sở', order['ten_co_so'] ?? ''),
-                    _buildRow('Địa chỉ', order['dia_chi_co_so'] ?? ''),
-                    _buildRow('Ngày đặt', _formatDate(order['ngay_dat'] ?? '')),
-                    _buildRow('Ngày hủy', _formatTimestamp(order['ngay_yeu_cau_huy'])),
-                  ]),
+                  // Thông tin đơn hàng
+                  _buildSection(
+                      'Thông tin đơn hàng',
+                      Icons.receipt_long,
+                      [
+                        _buildDetailRow('Mã đơn', maDon.isNotEmpty ? '#${maDon.substring(0, 8).toUpperCase()}' : '---'),
+                        _buildDetailRow('Tên cơ sở', tenCoSo),
+                        _buildDetailRow('Địa chỉ', diaChiCoSo),
+                        _buildDetailRow('Ngày đặt', _formatDate(order['ngay_dat'] ?? '')),
+                        _buildDetailRow('Ngày hủy', _formatTimestamp(order['ngay_yeu_cau_huy'])),
+                      ]
+                  ),
 
-                  SizedBox(height: 16),
+                  SizedBox(height: 20),
 
-                  _buildSection('Thông tin người đặt', [
-                    _buildRow('Tên', order['ten_nguoi_dat'] ?? ''),
-                    _buildRow('SĐT', order['sdt'] ?? ''),
-                  ]),
+                  // Thông tin người đặt
+                  _buildSection(
+                      'Thông tin người đặt',
+                      Icons.person,
+                      [
+                        _buildDetailRow('Tên', tenNguoiDat),
+                        _buildDetailRow('SĐT', sdt),
+                      ]
+                  ),
 
-                  SizedBox(height: 16),
+                  SizedBox(height: 20),
 
-                  _buildSection('Thông tin tiền', [
-                    _buildRow('Tổng tiền', '${_formatCurrency(tongTien)}đ'),
-                    _buildRow('Hoàn (80%)', '${_formatCurrency(soTienHoan)}đ', highlight: true),
-                    if (daHoanTien) _buildRow('Thời gian hoàn', _formatTimestamp(order['time_hoan_tien'])),
-                  ]),
+                  // Thông tin tiền
+                  _buildSection(
+                      'Thông tin tiền',
+                      Icons.payments,
+                      [
+                        _buildDetailRow('Tổng tiền', '${_formatCurrency(tongTien)}đ'),
+                        _buildDetailRow('Hoàn 80%', '${_formatCurrency(soTienHoan)}đ', highlight: true),
+                        if (daHoanTien && order['time_hoan_tien'] != null)
+                          _buildDetailRow('Thời gian hoàn', _formatTimestamp(order['time_hoan_tien'])),
+                      ]
+                  ),
+
+                  // Thông báo hỗ trợ
+                  if (!daHoanTien) ...[
+                    SizedBox(height: 20),
+                    Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF3498DB).withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Color(0xFF3498DB).withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.support_agent, size: 20, color: Color(0xFF3498DB)),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Hỗ trợ khách hàng',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF3498DB),
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Liên hệ CSKH: 1900 1234\nThời gian làm việc: 8:00 - 22:00',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF3498DB),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  SizedBox(height: 20),
                 ],
               ),
             ),
@@ -524,37 +815,64 @@ class _RefundDetailBottomSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildSection(String title, List<Widget> children) {
+  Widget _buildSection(String title, IconData icon, List<Widget> children) {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Color(0xFFF8F9FA),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Color(0xFFECF0F1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(icon, size: 20, color: Color(0xFFC44536)),
+              SizedBox(width: 8),
+              Text(
+                  title,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Color(0xFF2C3E50)
+                  )
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
           ...children,
         ],
       ),
     );
   }
 
-  Widget _buildRow(String label, String value, {bool highlight = false}) {
+  Widget _buildDetailRow(String label, String value, {bool highlight = false}) {
     return Padding(
       padding: EdgeInsets.only(bottom: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$label:', style: TextStyle(color: Colors.grey)),
-          Flexible(
+          Expanded(
+            flex: 2,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                  color: Color(0xFF7F8C8D),
+                  fontWeight: FontWeight.w500
+              ),
+            ),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            flex: 3,
             child: Text(
               value,
               style: TextStyle(
                 fontWeight: highlight ? FontWeight.bold : FontWeight.normal,
-                color: highlight ? Colors.orange : Colors.black,
+                color: highlight ? Color(0xFFC44536) : Color(0xFF2C3E50),
+                fontSize: highlight ? 15 : 14,
               ),
               textAlign: TextAlign.right,
             ),
