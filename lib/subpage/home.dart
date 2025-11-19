@@ -51,7 +51,7 @@ class _HomePageContentState extends State<HomePageContent> {
 
   Widget _buildFilterSection() {
     return Container(
-      padding: const EdgeInsets.all(14), // Padding vừa phải
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -65,13 +65,11 @@ class _HomePageContentState extends State<HomePageContent> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // CỘT 1: Tìm kiếm + Bộ lọc
           Expanded(
             child: Column(
               children: [
-                // Ô tìm tên sân
                 Container(
-                  height: 36, // Giảm 20% từ 45px
+                  height: 36,
                   child: TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
@@ -107,7 +105,6 @@ class _HomePageContentState extends State<HomePageContent> {
                 ),
                 const SizedBox(height: 10),
 
-                // Bộ lọc Xã | Phường | Tỉnh
                 Row(
                   children: [
                     Expanded(
@@ -139,7 +136,6 @@ class _HomePageContentState extends State<HomePageContent> {
                   ],
                 ),
 
-                // Nút xóa bộ lọc
                 if (_selectedTinh.isNotEmpty || _selectedHuyen.isNotEmpty || _selectedXa.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -175,11 +171,10 @@ class _HomePageContentState extends State<HomePageContent> {
             ),
           ),
 
-          // CỘT 2: Nút Sân Ưa Thích
           SizedBox(width: 12),
           Container(
-            width: 36, // Giảm 20% từ 45px
-            height: 36, // Giảm 20% từ 45px
+            width: 36,
+            height: 36,
             child: Material(
               color: Colors.transparent,
               child: InkWell(
@@ -199,7 +194,7 @@ class _HomePageContentState extends State<HomePageContent> {
                   child: Icon(
                     Icons.favorite,
                     color: Color(0xFFC44536),
-                    size: 20, // Giảm từ 24px
+                    size: 20,
                   ),
                 ),
               ),
@@ -210,7 +205,6 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
-// Cập nhật hàm _buildSmallFilterField với kích thước giảm 20%
   Widget _buildSmallFilterField({
     required TextEditingController controller,
     required String hint,
@@ -218,7 +212,7 @@ class _HomePageContentState extends State<HomePageContent> {
     required Function(String) onChanged,
   }) {
     return Container(
-      height: 32, // Giảm 20% từ 40px
+      height: 32,
       child: TextField(
         controller: controller,
         style: TextStyle(fontSize: 13),
@@ -312,10 +306,13 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
-  // Widget thẻ cơ sở MỚI - HIỂN THỊ CẢ 2 ẢNH (anh1: logo, anh2: ảnh bìa)
+  // Widget thẻ cơ sở - ĐÃ SỬA: anh_dai_dien = anh1, danh_sach_anh[0] = anh2
   Widget _buildCoSoCard(BuildContext context, String id, Map<String, dynamic> data) {
-    final anh1 = data['anh1'] as String? ?? '';
-    final anh2 = data['anh2'] as String? ?? '';
+    // SỬA: Lấy ảnh từ cấu trúc mới
+    final anh1 = data['anh_dai_dien'] as String? ?? ''; // Logo
+    final danhSachAnh = data['danh_sach_anh'] as List<dynamic>? ?? [];
+    final anh2 = danhSachAnh.isNotEmpty ? danhSachAnh[0] as String : ''; // Ảnh bìa
+
     final ten = data['ten'] as String? ?? 'Chưa có tên';
     final diaChiChiTiet = data['dia_chi_chi_tiet'] as String? ?? '';
     final xa = data['xa'] as String? ?? '';
@@ -324,14 +321,13 @@ class _HomePageContentState extends State<HomePageContent> {
     final sdt = data['sdt'] as String? ?? '';
     final gioMo = data['gio_mo_cua'] as String? ?? '';
     final gioDong = data['gio_dong_cua'] as String? ?? '';
-    final moTa = data['mo_ta'] as String? ?? '';
     final isOke = data['is_oke'] as int? ?? 0;
 
     final diaChi = [diaChiChiTiet, xa, huyen, tinh].where((s) => s.isNotEmpty).join(', ');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      height: 140, // Chiều cao cố định để đồng bộ
+      height: 140,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -356,7 +352,7 @@ class _HomePageContentState extends State<HomePageContent> {
           borderRadius: BorderRadius.circular(12),
           child: Row(
             children: [
-              // PHẦN ẢNH: Hiển thị cả ảnh bìa (anh2) và logo (anh1)
+              // PHẦN ẢNH: Hiển thị ảnh bìa (anh2) và logo (anh1)
               Container(
                 width: 140,
                 height: double.infinity,
@@ -369,7 +365,7 @@ class _HomePageContentState extends State<HomePageContent> {
                 ),
                 child: Stack(
                   children: [
-                    // Ảnh bìa (anh2) - background
+                    // Ảnh bìa (anh2 = danh_sach_anh[0]) - background
                     if (anh2.isNotEmpty)
                       ClipRRect(
                         borderRadius: BorderRadius.only(
@@ -387,7 +383,7 @@ class _HomePageContentState extends State<HomePageContent> {
                     else
                       _buildPlaceholderBanner(),
 
-                    // Logo (anh1) - overlay ở góc dưới phải
+                    // Logo (anh1 = anh_dai_dien) - overlay ở góc dưới phải
                     Positioned(
                       bottom: 8,
                       right: 8,
@@ -514,9 +510,13 @@ class _HomePageContentState extends State<HomePageContent> {
                               children: [
                                 Icon(Icons.phone, size: 12, color: Color(0xFF7F8C8D)),
                                 SizedBox(width: 4),
-                                Text(
-                                  sdt,
-                                  style: TextStyle(fontSize: 11, color: Color(0xFF7F8C8D)),
+                                Flexible(
+                                  child: Text(
+                                    sdt,
+                                    style: TextStyle(fontSize: 11, color: Color(0xFF7F8C8D)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                             ),
@@ -527,9 +527,13 @@ class _HomePageContentState extends State<HomePageContent> {
                               children: [
                                 Icon(Icons.access_time, size: 12, color: Color(0xFF7F8C8D)),
                                 SizedBox(width: 4),
-                                Text(
-                                  '$gioMo - $gioDong',
-                                  style: TextStyle(fontSize: 11, color: Color(0xFF7F8C8D)),
+                                Flexible(
+                                  child: Text(
+                                    '$gioMo - $gioDong',
+                                    style: TextStyle(fontSize: 11, color: Color(0xFF7F8C8D)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                               ],
                             ),
@@ -547,7 +551,6 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
-  // Widget placeholder cho ảnh bìa
   Widget _buildPlaceholderBanner() {
     return Container(
       decoration: BoxDecoration(
@@ -563,7 +566,6 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
-  // Widget placeholder cho logo
   Widget _buildPlaceholderLogo() {
     return Container(
       decoration: BoxDecoration(
@@ -576,7 +578,6 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
-  // Widget loading
   Widget _buildLoadingWidget() {
     return Center(
       child: Column(
@@ -593,7 +594,6 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
-  // Widget empty
   Widget _buildEmptyWidget(String message) {
     return Center(
       child: Column(
@@ -610,7 +610,6 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
-  // Widget error
   Widget _buildErrorWidget(String error) {
     return Center(
       child: Column(

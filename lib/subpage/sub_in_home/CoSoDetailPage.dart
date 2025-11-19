@@ -21,11 +21,128 @@ class CoSoDetailPage extends StatefulWidget {
 class _CoSoDetailPageState extends State<CoSoDetailPage> {
   bool _isFavorite = false;
   bool _isLoadingFav = true;
+  List<int> _processedBangGia = [];
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _validateAndProcessData();
+    });
+  }
+
+  Future<void> _validateAndProcessData() async {
+    // Kiểm tra cơ sở tồn tại
+    if (widget.coSoData.isEmpty) {
+      _showErrorDialog('Cơ sở không tồn tại', 'Không tìm thấy thông tin cơ sở này.');
+      return;
+    }
+
+    // Kiểm tra bảng giá
+    final giaSan = widget.coSoData['gia_san'] as List<dynamic>?;
+    final bangGia = widget.coSoData['bang_gia'] as List<dynamic>?;
+
+    // Nếu cả 2 đều null/rỗng
+    if ((giaSan == null || giaSan.isEmpty) && (bangGia == null || bangGia.isEmpty)) {
+      _showErrorDialog('Thiếu thông tin giá', 'Cơ sở chưa cập nhật bảng giá.');
+      return;
+    }
+
+    // Nếu có gia_san → tạo bang_gia từ gia_san
+    if (giaSan != null && giaSan.isNotEmpty) {
+      _processedBangGia = _createBangGiaFromGiaSan(giaSan);
+    }
+    // Nếu chỉ có bang_gia → validate bang_gia
+    else if (bangGia != null && bangGia.isNotEmpty) {
+      if (!_validateBangGia(bangGia)) {
+        _showErrorDialog('Bảng giá không hợp lệ', 'Bảng giá phải có đủ 24 giá trị hợp lệ (> 0).');
+        return;
+      }
+      _processedBangGia = bangGia.map((e) => (e is int ? e : (e as num).toInt())).toList();
+    }
+
+    // Nếu validate thành công → load favorite status
     _checkFavoriteStatus();
+  }
+
+  List<int> _createBangGiaFromGiaSan(List<dynamic> giaSan) {
+    List<int> bangGia = List.filled(24, 10000); // Mặc định 10000đ
+
+    for (var item in giaSan) {
+      if (item is! Map<String, dynamic>) continue;
+
+      final gio = item['gio'] as String?;
+      final gia = item['gia'];
+
+      if (gio == null || gio.isEmpty || gia == null) continue;
+
+      // Parse giờ từ "19:00 - 20:00" → lấy 19
+      final gioBatDau = _parseGioBatDau(gio);
+      if (gioBatDau == null || gioBatDau < 0 || gioBatDau >= 24) continue;
+
+      final giaInt = gia is int ? gia : (gia as num).toInt();
+      bangGia[gioBatDau] = giaInt;
+    }
+
+    return bangGia;
+  }
+
+  int? _parseGioBatDau(String gioStr) {
+    try {
+      // "19:00 - 20:00" → "19:00" → 19
+      final parts = gioStr.split('-');
+      if (parts.isEmpty) return null;
+
+      final gioBatDau = parts[0].trim().split(':');
+      if (gioBatDau.isEmpty) return null;
+
+      return int.tryParse(gioBatDau[0]);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  bool _validateBangGia(List<dynamic> bangGia) {
+    if (bangGia.length != 24) return false;
+
+    for (var gia in bangGia) {
+      if (gia == null) return false;
+
+      final giaInt = gia is int ? gia : (gia is num ? (gia as num).toInt() : null);
+      if (giaInt == null || giaInt < 1) return false;
+    }
+
+    return true;
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Color(0xFFC44536)),
+            SizedBox(width: 8),
+            Text(title),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).pop();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFFC44536),
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Quay lại'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _checkFavoriteStatus() async {
@@ -103,14 +220,6 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
     if (viTri != null) {
       latitude = viTri.latitude;
       longitude = viTri.longitude;
-    } else {
-      final toaDoX = widget.coSoData['toa_do_x'];
-      final toaDoY = widget.coSoData['toa_do_y'];
-
-      if (toaDoX != null && toaDoY != null) {
-        latitude = double.tryParse(toaDoX.toString());
-        longitude = double.tryParse(toaDoY.toString());
-      }
     }
 
     if (latitude == null || longitude == null) {
@@ -123,6 +232,33 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
       _showMessage('Không thể mở Google Maps');
+    }
+  }
+
+  Future<void> _openWebsite(String webUrl) async {
+    if (webUrl.isEmpty) return;
+
+    String url = webUrl;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://$url';
+    }
+
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      _showMessage('Không thể mở website');
+    }
+  }
+
+  Future<void> _openZaloGroup(String zaloUrl) async {
+    if (zaloUrl.isEmpty) return;
+
+    final uri = Uri.parse(zaloUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      _showMessage('Không thể mở nhóm Zalo');
     }
   }
 
@@ -144,23 +280,32 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
   }
 
   String? _getLogoImage() {
-    return widget.coSoData['anh1'] as String?;
+    return widget.coSoData['anh_dai_dien'] as String?;
   }
 
   String? _getCoverImage() {
-    return widget.coSoData['anh2'] as String?;
+    final danhSachAnh = widget.coSoData['danh_sach_anh'] as List<dynamic>?;
+    if (danhSachAnh != null && danhSachAnh.isNotEmpty) {
+      final firstImage = danhSachAnh[0] as String?;
+      if (firstImage != null && firstImage.isNotEmpty) {
+        return firstImage;
+      }
+    }
+    return null;
   }
 
   List<String> _getGalleryImages() {
     final images = <String>[];
+    final danhSachAnh = widget.coSoData['danh_sach_anh'] as List<dynamic>?;
 
-    final anh3 = widget.coSoData['anh3'] as String?;
-    final anh4 = widget.coSoData['anh4'] as String?;
-    final anh5 = widget.coSoData['anh5'] as String?;
-
-    if (anh3 != null && anh3.isNotEmpty) images.add(anh3);
-    if (anh4 != null && anh4.isNotEmpty) images.add(anh4);
-    if (anh5 != null && anh5.isNotEmpty) images.add(anh5);
+    if (danhSachAnh != null && danhSachAnh.length > 1) {
+      for (int i = 1; i < danhSachAnh.length; i++) {
+        final img = danhSachAnh[i] as String?;
+        if (img != null && img.isNotEmpty) {
+          images.add(img);
+        }
+      }
+    }
 
     return images;
   }
@@ -174,6 +319,15 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
     );
   }
 
+  void _showServicesBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildServicesBottomSheet(),
+    );
+  }
+
   void _showReviewsBottomSheet() {
     showModalBottomSheet(
       context: context,
@@ -183,14 +337,13 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
     );
   }
 
-  // Hàm hiển thị ảnh toàn màn hình
   void _showImageFullScreen(String imageUrl) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.8), // nền đen nhẹ
+      barrierColor: Colors.black.withOpacity(0.8),
       builder: (context) => Dialog(
         backgroundColor: Colors.black,
-        insetPadding: EdgeInsets.all(20), // khoảng cách từ mép màn hình
+        insetPadding: EdgeInsets.all(20),
         child: Stack(
           children: [
             InteractiveViewer(
@@ -222,8 +375,6 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                 ),
               ),
             ),
-
-            // nút đóng
             Positioned(
               top: 8,
               right: 8,
@@ -250,7 +401,6 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
       ),
       child: Column(
         children: [
-          // Header
           Container(
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -276,12 +426,56 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
               ],
             ),
           ),
-          // Content
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.all(16),
               child: _buildPriceTables(),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServicesBottomSheet() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.8,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Color(0xFFECF0F1)),
+              ),
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: Icon(Icons.close, color: Color(0xFF2C3E50)),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'Dịch vụ khác',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2C3E50),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _buildServicesContent(),
           ),
         ],
       ),
@@ -300,7 +494,6 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
       ),
       child: Column(
         children: [
-          // Header
           Container(
             padding: EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -326,12 +519,88 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
               ],
             ),
           ),
-          // Content
           Expanded(
             child: _buildReviewsContent(),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildServicesContent() {
+    final dichVuKhac = widget.coSoData['dich_vu_khac'] as List<dynamic>?;
+
+    if (dichVuKhac == null || dichVuKhac.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            'Chưa có thông tin dịch vụ khác',
+            style: TextStyle(color: Color(0xFF7F8C8D)),
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.all(16),
+      itemCount: dichVuKhac.length,
+      itemBuilder: (context, index) {
+        final dichVu = dichVuKhac[index] as Map<String, dynamic>;
+        final ten = dichVu['ten'] as String? ?? '';
+        final gia = dichVu['gia'];
+
+        if (ten.isEmpty || gia == null) return SizedBox.shrink();
+
+        final giaInt = gia is int ? gia : (gia as num).toInt();
+
+        return Container(
+          margin: EdgeInsets.only(bottom: 12),
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Color(0xFFF8F9FA),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Color(0xFFECF0F1)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Color(0xFFC44536).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.room_service, color: Color(0xFFC44536), size: 24),
+              ),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ten,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF2C3E50),
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '${_formatCurrency(giaInt)}đ',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFC44536),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -383,60 +652,46 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
 
     return Scaffold(
       backgroundColor: Color(0xFFECF0F1),
-      body: CustomScrollView(
-        slivers: [
-          // Phần 1: AppBar với nút quay về và tiêu đề
-          SliverAppBar(
-            backgroundColor: Colors.white,
-            primary: false,
-            elevation: 0,
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back, color: Color(0xFF2C3E50)),
-              onPressed: () => Navigator.pop(context),
-            ),
-            title: Text(
-              'Thông tin sân',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2C3E50),
-              ),
-            ),
-            centerTitle: true,
-            pinned: true,
-          ),
-
-          // Phần 2: Các nút chức năng
-          SliverToBoxAdapter(
-            child: Container(
-              color: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
+      body: Stack(
+        children: [
+          CustomScrollView(
+            slivers: [
+              // AppBar với tất cả các nút trên cùng 1 hàng
+              SliverAppBar(
+                backgroundColor: Colors.white,
+                elevation: 2,
+                pinned: true,
+                leading: IconButton(
+                  icon: Icon(Icons.arrow_back, color: Color(0xFF2C3E50)),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                title: Text(
+                  ten,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2C3E50),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                actions: [
                   // Nút yêu thích
-                  _buildActionButton(
-                    icon: _isFavorite ? Icons.favorite : Icons.favorite_border,
-                    label: 'Yêu thích',
-                    color: _isFavorite ? Color(0xFFC44536) : Color(0xFF2C3E50),
-                    onTap: _toggleFavorite,
-                    isLoading: _isLoadingFav,
+                  IconButton(
+                    icon: Icon(
+                      _isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: _isFavorite ? Color(0xFFC44536) : Color(0xFF2C3E50),
+                    ),
+                    onPressed: _isLoadingFav ? null : _toggleFavorite,
                   ),
-
                   // Nút đánh giá
-                  _buildActionButton(
-                    icon: Icons.star_border,
-                    label: 'Đánh giá',
-                    color: Color(0xFF2C3E50),
-                    onTap: _showReviewDialog,
+                  IconButton(
+                    icon: Icon(Icons.star_border, color: Color(0xFF2C3E50)),
+                    onPressed: _showReviewDialog,
                   ),
-
                   // Nút đặt lịch
-                  _buildActionButton(
-                    icon: Icons.calendar_today,
-                    label: 'Đặt lịch',
-                    color: Color(0xFF2C3E50),
-                    onTap: () {
+                  IconButton(
+                    icon: Icon(Icons.calendar_today, color: Color(0xFF2C3E50)),
+                    onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -448,179 +703,211 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                       );
                     },
                   ),
-
-                  // Nút chỉ đường - ĐÃ THÊM LẠI
-                  _buildActionButton(
-                    icon: Icons.map,
-                    label: 'Chỉ đường',
-                    color: Color(0xFF2C3E50),
-                    onTap: _openGoogleMaps,
+                  // Nút chỉ đường
+                  IconButton(
+                    icon: Icon(Icons.map, color: Color(0xFF2C3E50)),
+                    onPressed: _openGoogleMaps,
                   ),
+                  SizedBox(width: 8),
                 ],
               ),
-            ),
+
+              // Ảnh bìa và logo
+              SliverToBoxAdapter(
+                child: _buildCoverSection(ten, logoImage, coverImage),
+              ),
+
+              // Gallery
+              if (galleryImages.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: _buildGallerySection(galleryImages),
+                ),
+
+              // Thông tin cơ bản
+              SliverToBoxAdapter(
+                child: _buildBasicInfoSection(),
+              ),
+
+              // Khoảng cách cuối để không bị che bởi bottom bar
+              SliverToBoxAdapter(
+                child: SizedBox(height: 80),
+              ),
+            ],
           ),
 
-          // Phần 3: Ảnh đại diện và ảnh bìa (kiểu Facebook)
-          SliverToBoxAdapter(
-            child: _buildCoverSection(ten, logoImage, coverImage),
-          ),
-
-          // Phần 4: Các ảnh gallery
-          if (galleryImages.isNotEmpty)
-            SliverToBoxAdapter(
-              child: _buildGallerySection(galleryImages),
-            ),
-
-          // Phần thông tin cơ bản
-          SliverToBoxAdapter(
-            child: _buildBasicInfoSection(),
-          ),
-
-          // Phần các nút Bảng giá và Bình luận
-          SliverToBoxAdapter(
-            child: _buildActionSection(),
-          ),
-
-          // Khoảng cách cuối
-          SliverToBoxAdapter(
-            child: SizedBox(height: 20),
+          // Bottom bar cố định
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: _buildBottomActionBar(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-    bool isLoading = false,
-  }) {
-    return Expanded(
-      child: InkWell(
-        onTap: isLoading ? null : onTap,
-        child: Container(
-          padding: EdgeInsets.symmetric(vertical: 12),
-          child: Column(
-            children: [
-              if (isLoading)
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: color),
-                )
-              else
-                Icon(icon, color: color, size: 24),
-              SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: color,
-                  fontWeight: FontWeight.w500,
+  Widget _buildBottomActionBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 8,
+            offset: Offset(0, -2),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _showPriceBottomSheet,
+              icon: Icon(Icons.attach_money, size: 18),
+              label: Text('Bảng giá', style: TextStyle(fontSize: 13)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFFC44536),
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+          SizedBox(width: 8),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _showServicesBottomSheet,
+              icon: Icon(Icons.room_service, size: 18),
+              label: Text('Dịch vụ', style: TextStyle(fontSize: 13)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Color(0xFF2C3E50),
+                padding: EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(color: Color(0xFFBDC3C7)),
+                ),
+              ),
+            ),
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _showReviewsBottomSheet,
+              icon: Icon(Icons.comment, size: 18),
+              label: Text('Đánh giá', style: TextStyle(fontSize: 13)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Color(0xFF2C3E50),
+                padding: EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(color: Color(0xFFBDC3C7)),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildCoverSection(String ten, String? logoImage, String? coverImage) {
     return Container(
-      color: Colors.white,
-      margin: EdgeInsets.only(bottom: 8),
-      child: Column(
-        children: [
-          // Ảnh bìa - CÓ THỂ NHẤN ĐỂ XEM
-          GestureDetector(
-            onTap: coverImage != null ? () => _showImageFullScreen(coverImage!) : null,
-            child: Container(
-              height: 200,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Color(0xFFBDC3C7),
+        color: Colors.white,
+        margin: EdgeInsets.only(bottom: 8),
+        child: Column(
+            children: [
+        // Ảnh bìa
+        GestureDetector(
+        onTap: coverImage != null ? () => _showImageFullScreen(coverImage!) : null,
+    child: Container(
+    height: 200,
+    width: double.infinity,
+    decoration: BoxDecoration(
+    color: Color(0xFFBDC3C7),
+    ),
+    child: coverImage != null
+    ? Image.network(
+    coverImage,
+    fit: BoxFit.cover,
+    errorBuilder: (_, __, ___) => Icon(Icons.broken_image, size: 40),
+    )
+        : Icon(Icons.photo, size: 40, color: Colors.white),
+    ),
+    ),
+
+    // Logo và tên
+    Container(
+    padding: EdgeInsets.all(16),
+    child: Row(
+    children: [
+    // Logo
+    GestureDetector(
+    onTap: logoImage != null ? () => _showImageFullScreen(logoImage!) : null,
+    child: Container(
+    width: 80,
+    height: 80,
+    margin: EdgeInsets.only(right: 16),
+    decoration: BoxDecoration(
+    borderRadius: BorderRadius.circular(12),
+    color: Colors.white,
+    boxShadow: [
+    BoxShadow(
+    color: Colors.black26,
+    blurRadius: 8,
+    offset: Offset(0, 2),
+    ),
+    ],
+    ),
+      child: logoImage != null
+          ? ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          logoImage,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Icon(Icons.business, size: 40),
+        ),
+      )
+          : Icon(Icons.business, size: 40, color: Color(0xFFC44536)),
+    ),
+    ),
+
+      // Tên và thông tin
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              ten,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2C3E50),
               ),
-              child: coverImage != null
-                  ? Image.network(
-                coverImage,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Icon(Icons.broken_image, size: 40),
-              )
-                  : Icon(Icons.photo, size: 40, color: Colors.white),
             ),
-          ),
-
-          // Logo và tên
-          Container(
-            padding: EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // Logo - CÓ THỂ NHẤN ĐỂ XEM
-                GestureDetector(
-                  onTap: logoImage != null ? () => _showImageFullScreen(logoImage!) : null,
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    margin: EdgeInsets.only(right: 16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      color: Colors.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 8,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: logoImage != null
-                        ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        logoImage,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(Icons.business, size: 40),
-                      ),
-                    )
-                        : Icon(Icons.business, size: 40, color: Color(0xFFC44536)),
-                  ),
-                ),
-
-                // Tên và thông tin
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        ten,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2C3E50),
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '${widget.coSoData['dia_chi_chi_tiet'] ?? ''}, ${widget.coSoData['xa'] ?? ''}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF7F8C8D),
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+            SizedBox(height: 4),
+            Text(
+              '${widget.coSoData['dia_chi_chi_tiet'] ?? ''}, ${widget.coSoData['xa'] ?? ''}',
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF7F8C8D),
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+    ],
+    ),
+    ),
+            ],
+        ),
     );
   }
 
@@ -704,8 +991,75 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             'Giờ mở cửa',
             '${data['gio_mo_cua']} - ${data['gio_dong_cua']}',
           ),
+
+          // Website button
           if ((data['web'] as String?)?.isNotEmpty == true)
-            _buildInfoRow(Icons.language, 'Website', data['web'] as String),
+            Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: InkWell(
+                onTap: () => _openWebsite(data['web'] as String),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Color(0xFFC44536).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(Icons.language, size: 16, color: Color(0xFFC44536)),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Website',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF7F8C8D),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Color(0xFFC44536).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Color(0xFFC44536).withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    data['web'] as String,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Color(0xFFC44536),
+                                      fontWeight: FontWeight.w600,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                SizedBox(width: 6),
+                                Icon(Icons.open_in_new, size: 16, color: Color(0xFFC44536)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Nhóm Zalo buttons
+          _buildZaloGroupsSection(),
 
           SizedBox(height: 8),
           Divider(color: Color(0xFFECF0F1)),
@@ -726,6 +1080,92 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
               fontSize: 14,
               height: 1.5,
               color: Color(0xFF2C3E50),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildZaloGroupsSection() {
+    final nhomSeVe = widget.coSoData['nhom_xe_ve'];
+    List<String> zaloGroups = [];
+
+    if (nhomSeVe is List) {
+      zaloGroups = nhomSeVe
+          .where((item) => item is String && item.isNotEmpty)
+          .map((item) => item as String)
+          .toList();
+    } else if (nhomSeVe is String && nhomSeVe.isNotEmpty) {
+      zaloGroups = [nhomSeVe];
+    }
+
+    if (zaloGroups.isEmpty) return SizedBox.shrink();
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Color(0xFFC44536).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(Icons.group, size: 16, color: Color(0xFFC44536)),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Nhóm Zalo',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF7F8C8D),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: zaloGroups.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final url = entry.value;
+                    return InkWell(
+                      onTap: () => _openZaloGroup(url),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Color(0xFF0068FF).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Color(0xFF0068FF).withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.chat, size: 16, color: Color(0xFF0068FF)),
+                            SizedBox(width: 6),
+                            Text(
+                              'Nhóm ${index + 1}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF0068FF),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(width: 4),
+                            Icon(Icons.open_in_new, size: 14, color: Color(0xFF0068FF)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
             ),
           ),
         ],
@@ -778,162 +1218,22 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
     );
   }
 
-  Widget _buildActionSection() {
-    return Container(
-      color: Colors.white,
-      padding: EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _showPriceBottomSheet,
-              icon: Icon(Icons.attach_money, size: 20),
-              label: Text('Bảng giá'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFFC44536),
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-            ),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: _showReviewsBottomSheet,
-              icon: Icon(Icons.comment, size: 20),
-              label: Text('Bình luận'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: Color(0xFF2C3E50),
-                padding: EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  side: BorderSide(color: Color(0xFFBDC3C7)),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Các hàm _buildPriceTables, _buildBangGiaTable, _buildGiaSanTable, _buildPriceSection,
-  // _formatCurrency, _buildReviewCard, _formatDate giữ nguyên như code trước
-  // ... (giữ nguyên tất cả các hàm này)
-
   Widget _buildPriceTables() {
-    final bangGia = widget.coSoData['bang_gia'] as List<dynamic>?;
     final giaSan = widget.coSoData['gia_san'] as List<dynamic>?;
 
-    if ((bangGia == null || bangGia.isEmpty) &&
-        (giaSan == null || giaSan.isEmpty)) {
-      return Container(
-        padding: EdgeInsets.all(16),
-        child: Text('Chưa có thông tin bảng giá'),
+    // Nếu có gia_san, hiển thị chi tiết
+    if (giaSan != null && giaSan.isNotEmpty) {
+      return Column(
+        children: [
+          //_buildGiaSanTable(giaSan),
+          //SizedBox(height: 16),
+          _buildBangGiaTable(_processedBangGia),
+        ],
       );
     }
 
-    return Column(
-      children: [
-        if (bangGia != null && bangGia.isNotEmpty)
-          _buildBangGiaTable(bangGia),
-
-        if (bangGia != null && bangGia.isNotEmpty &&
-            giaSan != null && giaSan.isNotEmpty)
-          SizedBox(height: 16),
-
-        if (giaSan != null && giaSan.isNotEmpty)
-          _buildGiaSanTable(giaSan),
-      ],
-    );
-  }
-
-  Widget _buildBangGiaTable(List<dynamic> bangGia) {
-    final gioMoCua = widget.coSoData['gio_mo_cua'] as String?;
-    final gioDongCua = widget.coSoData['gio_dong_cua'] as String?;
-
-    if (gioMoCua == null || gioDongCua == null) {
-      return SizedBox.shrink();
-    }
-
-    final gioMo = int.tryParse(gioMoCua.split(':')[0]) ?? 6;
-    final gioDong = int.tryParse(gioDongCua.split(':')[0]) ?? 22;
-
-    List<Map<String, dynamic>> morningPrices = [];
-    List<Map<String, dynamic>> afternoonPrices = [];
-    List<Map<String, dynamic>> nightPrices = [];
-
-    for (int i = gioMo; i < gioDong; i++) {
-      if (i < bangGia.length) {
-        final price = bangGia[i];
-        final priceData = {
-          'time': '${i}h - ${i + 1}h',
-          'price': price is int ? price : (price as num).toInt(),
-        };
-
-        if (i < 12) {
-          morningPrices.add(priceData);
-        } else if (i < 18) {
-          afternoonPrices.add(priceData);
-        } else {
-          nightPrices.add(priceData);
-        }
-      }
-    }
-
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFFECF0F1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Bảng giá theo giờ',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2C3E50),
-            ),
-          ),
-          SizedBox(height: 16),
-
-          if (morningPrices.isNotEmpty) ...[
-            _buildPriceSection(
-              title: 'Buổi sáng',
-              icon: Icons.wb_sunny,
-              prices: morningPrices,
-            ),
-            if (afternoonPrices.isNotEmpty || nightPrices.isNotEmpty)
-              SizedBox(height: 12),
-          ],
-
-          if (afternoonPrices.isNotEmpty) ...[
-            _buildPriceSection(
-              title: 'Buổi chiều',
-              icon: Icons.cloud,
-              prices: afternoonPrices,
-            ),
-            if (nightPrices.isNotEmpty)
-              SizedBox(height: 12),
-          ],
-
-          if (nightPrices.isNotEmpty)
-            _buildPriceSection(
-              title: 'Buổi tối',
-              icon: Icons.nightlight_round,
-              prices: nightPrices,
-            ),
-        ],
-      ),
-    );
+    // Nếu không có gia_san, chỉ hiển thị bang_gia
+    return _buildBangGiaTable(_processedBangGia);
   }
 
   Widget _buildGiaSanTable(List<dynamic> giaSan) {
@@ -1001,6 +1301,87 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
               ),
             );
           }).toList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBangGiaTable(List<int> bangGia) {
+    final gioMoCua = widget.coSoData['gio_mo_cua'] as String?;
+    final gioDongCua = widget.coSoData['gio_dong_cua'] as String?;
+
+    if (gioMoCua == null || gioDongCua == null) {
+      return SizedBox.shrink();
+    }
+
+    final gioMo = int.tryParse(gioMoCua.split(':')[0]) ?? 6;
+    final gioDong = int.tryParse(gioDongCua.split(':')[0]) ?? 22;
+
+    List<Map<String, dynamic>> morningPrices = [];
+    List<Map<String, dynamic>> afternoonPrices = [];
+    List<Map<String, dynamic>> nightPrices = [];
+
+    for (int i = gioMo; i < gioDong && i < bangGia.length; i++) {
+      final priceData = {
+        'time': '${i}h - ${i + 1}h',
+        'price': bangGia[i],
+      };
+
+      if (i < 12) {
+        morningPrices.add(priceData);
+      } else if (i < 18) {
+        afternoonPrices.add(priceData);
+      } else {
+        nightPrices.add(priceData);
+      }
+    }
+
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Color(0xFFECF0F1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Bảng giá theo giờ',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2C3E50),
+            ),
+          ),
+          SizedBox(height: 16),
+
+          if (morningPrices.isNotEmpty) ...[
+            _buildPriceSection(
+              title: 'Buổi sáng',
+              icon: Icons.wb_sunny,
+              prices: morningPrices,
+            ),
+            if (afternoonPrices.isNotEmpty || nightPrices.isNotEmpty)
+              SizedBox(height: 12),
+          ],
+
+          if (afternoonPrices.isNotEmpty) ...[
+            _buildPriceSection(
+              title: 'Buổi chiều',
+              icon: Icons.cloud,
+              prices: afternoonPrices,
+            ),
+            if (nightPrices.isNotEmpty)
+              SizedBox(height: 12),
+          ],
+
+          if (nightPrices.isNotEmpty)
+            _buildPriceSection(
+              title: 'Buổi tối',
+              icon: Icons.nightlight_round,
+              prices: nightPrices,
+            ),
         ],
       ),
     );
@@ -1141,7 +1522,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
   }
 }
 
-// ReviewDialog giữ nguyên
+// ReviewDialog
 class ReviewDialog extends StatefulWidget {
   final String coSoId;
   final String coSoName;
