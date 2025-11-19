@@ -1,4 +1,4 @@
-FROM google/dart:2.19
+FROM dart:stable
 
 WORKDIR /app
 COPY . .
