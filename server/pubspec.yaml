@@ -1,0 +1,14 @@
+name: payos_webhook_server
+description: PayOS Webhook Server in Dart
+version: 1.0.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  shelf: ^1.4.0
+  shelf_router: ^1.1.0
+  crypto: ^3.0.3
+
+dev_dependencies:
+  test: ^1.24.0
