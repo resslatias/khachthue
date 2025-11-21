@@ -90,13 +90,13 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         return;
       }
 
-      final userDoc = await firestore.collection('users').doc(userId).get();
+      final userDoc = await firestore.collection('nguoi_thue').doc(userId).get();
 
       if (userDoc.exists) {
         final userData = userDoc.data();
         setState(() {
-          _userName = userData?['ten'] ?? userData?['name'] ?? '';
-          _userPhone = userData?['sdt'] ?? userData?['phone'] ?? '';
+          _userName = userData?['ho_ten'] ?? userData?['name'] ?? '';
+          _userPhone = userData?['so_dien_thoai'] ?? userData?['phone'] ?? '';
           _isLoadingUserInfo = false;
         });
 
@@ -360,6 +360,11 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
   }
 
   Future<void> confirmAll() async {
+    // Đảm bảo load xong user info trước khi mở dialog
+    if (_isLoadingUserInfo) {
+      await _loadUserInfo();
+    }
+
     if (pendingChanges.isEmpty) {
       showDialog(
         context: context,
@@ -430,22 +435,45 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         .map((p) => "Sân ${p['san'] + 1} lúc ${p['hour']}-${p['hour'] + 1}h (${_formatCurrency(getPriceForHour(p['hour']))}đ)")
         .join("\n");
 
-    // TỰ ĐỘNG ĐIỀN THÔNG TIN USER VÀO TextField
+// ✅ Load user info trước, BỎ kiểm tra _isLoadingUserInfo
+    if (_userName.isEmpty || _userPhone.isEmpty) {
+      await _loadUserInfo();
+    }
+
+// TỰ ĐỘNG ĐIỀN THÔNG TIN USER VÀO TextField
     TextEditingController nameController = TextEditingController(text: _userName);
     TextEditingController phoneController = TextEditingController(text: _userPhone);
 
     bool? confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Row(
-          children: [
-            Icon(Icons.sports_tennis, color: Color(0xFFC44536)),
-            const SizedBox(width: 8),
-            const Text("Xác nhận đặt sân"),
-          ],
-        ),
+      builder: (context) =>
+          AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            insetPadding: EdgeInsets.symmetric(horizontal: 16), // ← THÊM dòng này để dialog rộng hơn
+            titlePadding: EdgeInsets.zero, // ← THÊM để custom title padding
+            contentPadding: EdgeInsets.all(16), // ← Padding cho content
+
+            title: Container( // ← Wrap title trong Container
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Color(0xFFC44536), // ← Nền đỏ
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.sports_tennis, color: Colors.white), // ← Đổi màu trắng
+                  const SizedBox(width: 8),
+                  const Text(
+                    "Xác nhận đặt sân",
+                    style: TextStyle(color: Colors.white), // ← Đổi màu trắng
+                  ),
+                ],
+              ),
+            ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -506,15 +534,8 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
               ),
               const SizedBox(height: 16),
 
-// Hiển thị loading hoặc form nhập thông tin
-              _isLoadingUserInfo
-                  ? Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: CircularProgressIndicator(color: Color(0xFFC44536)),
-                ),
-              )
-                  : Column(
+
+              Column(
                 children: [
                   TextField(
                     controller: nameController,
@@ -932,36 +953,39 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
   //  HEADER ĐÃ GIẢM PADDING
   Widget _buildCustomAppBar() {
     return Container(
-      padding: EdgeInsets.only(
-        top: 8,
-        bottom: 8,
-        left: 8,
-        right: 8,
-      ),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8), // GIẢM THÊM
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.black12,
-            blurRadius: 4,
-            offset: Offset(0, 2),
+            blurRadius: 1,
+            offset: Offset(0, 1),
           ),
         ],
       ),
       child: Row(
         children: [
-          IconButton(
-            icon: Icon(Icons.arrow_back, color: Color(0xFF2C3E50)),
-            onPressed: () => _handleBackPressed().then((_) {
-              if (pendingChanges.isEmpty) Navigator.pop(context);
-            }),
+          // NÚT NHỎ HƠN NỮA
+          SizedBox(
+            width: 32,
+            height: 32,
+            child: IconButton(
+              icon: Icon(Icons.arrow_back,
+                  color: Color(0xFF2C3E50),
+                  size: 20),
+              padding: EdgeInsets.all(6), // PADDING RẤT NHỎ
+              onPressed: () => _handleBackPressed().then((_) {
+                if (pendingChanges.isEmpty) Navigator.pop(context);
+              }),
+            ),
           ),
           const SizedBox(width: 4),
           Expanded(
             child: Text(
               widget.coSoData['ten'] as String? ?? "Trạng thái sân",
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16, // NHỎ HƠN NỮA
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF2C3E50),
               ),
@@ -977,7 +1001,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
   //  DATE SELECTOR ĐÃ GIẢM PADDING
   Widget _buildDateSelector() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
       child: InkWell(
         onTap: () async {
           DateTime today = DateTime.now();
@@ -1027,7 +1051,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
                 child: Text(
                   displayDate(selectedDate),
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                   ),
                 ),

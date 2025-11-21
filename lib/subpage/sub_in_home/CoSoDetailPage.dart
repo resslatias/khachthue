@@ -419,7 +419,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
 
   Widget _buildPriceBottomSheet() {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
+      height: MediaQuery.of(context).size.height * 0.7, // GIẢM TỪ 0.7 XUỐNG 0.6
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.only(
@@ -429,8 +429,9 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
       ),
       child: Column(
         children: [
+          // HEADER - GIẢM PADDING VÀ KÍCH THƯỚC
           Container(
-            padding: EdgeInsets.all(16),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), // GIẢM VERTICAL PADDING
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(color: Color(0xFFECF0F1)),
@@ -439,14 +440,16 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.close, color: Color(0xFF2C3E50)),
+                  icon: Icon(Icons.close, size: 22, color: Color(0xFF2C3E50)), // GIẢM KÍCH THƯỚC ICON
+                  padding: EdgeInsets.zero, // GIẢM PADDING ICON
+                  constraints: BoxConstraints(minWidth: 36, minHeight: 36), // GIẢM KÍCH THƯỚC BUTTON
                   onPressed: () => Navigator.pop(context),
                 ),
-                SizedBox(width: 8),
+                SizedBox(width: 4), // GIẢM KHOẢNG CÁCH
                 Text(
                   'Bảng giá',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 17, // GIẢM FONT SIZE
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF2C3E50),
                   ),
@@ -454,9 +457,11 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
               ],
             ),
           ),
+
+          // NỘI DUNG BẢNG GIÁ - GIẢM PADDING
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(16),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12), // GIẢM PADDING
               child: _buildPriceTables(),
             ),
           ),
@@ -467,7 +472,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
 
   Widget _buildServicesBottomSheet() {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
+      height: MediaQuery.of(context).size.height * 0.7, // GIẢM TỪ 0.8 XUỐNG 0.6
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.only(
@@ -477,8 +482,9 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
       ),
       child: Column(
         children: [
+          // HEADER - GIẢM PADDING VÀ KÍCH THƯỚC
           Container(
-            padding: EdgeInsets.all(16),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), // GIẢM VERTICAL PADDING
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(color: Color(0xFFECF0F1)),
@@ -487,14 +493,16 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.close, color: Color(0xFF2C3E50)),
+                  icon: Icon(Icons.close, size: 22, color: Color(0xFF2C3E50)), // GIẢM KÍCH THƯỚC ICON
+                  padding: EdgeInsets.zero, // GIẢM PADDING ICON
+                  constraints: BoxConstraints(minWidth: 36, minHeight: 36), // GIẢM KÍCH THƯỚC BUTTON
                   onPressed: () => Navigator.pop(context),
                 ),
-                SizedBox(width: 8),
+                SizedBox(width: 4), // GIẢM KHOẢNG CÁCH
                 Text(
                   'Dịch vụ khác',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 17, // GIẢM FONT SIZE
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF2C3E50),
                   ),
@@ -502,6 +510,8 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
               ],
             ),
           ),
+
+          // NỘI DUNG DỊCH VỤ
           Expanded(
             child: _buildServicesContent(),
           ),
@@ -512,7 +522,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
 
   Widget _buildReviewsBottomSheet() {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
+      height: MediaQuery.of(context).size.height * 0.7, // GIẢM TỪ 0.7 XUỐNG 0.6
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.only(
@@ -522,8 +532,9 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
       ),
       child: Column(
         children: [
+          // HEADER - GIẢM PADDING VÀ KÍCH THƯỚC
           Container(
-            padding: EdgeInsets.all(16),
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10), // GIẢM VERTICAL PADDING
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(color: Color(0xFFECF0F1)),
@@ -532,37 +543,44 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.close, color: Color(0xFF2C3E50)),
+                  icon: Icon(Icons.close, size: 22, color: Color(0xFF2C3E50)), // GIẢM KÍCH THƯỚC ICON
+                  padding: EdgeInsets.zero, // GIẢM PADDING ICON
+                  constraints: BoxConstraints(minWidth: 36, minHeight: 36), // GIẢM KÍCH THƯỚC BUTTON
                   onPressed: () => Navigator.pop(context),
                 ),
-                SizedBox(width: 8),
+                SizedBox(width: 4), // GIẢM KHOẢNG CÁCH
                 Expanded(
                   child: Text(
                     'Các đánh giá',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 17, // GIẢM FONT SIZE
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF2C3E50),
                     ),
                   ),
                 ),
-                // thêm đánh giá
+                // Nút thêm đánh giá - GIẢM KÍCH THƯỚC
                 ElevatedButton.icon(
                   onPressed: _showReviewDialog,
-                  icon: Icon(Icons.edit, size: 16),
-                  label: Text('Viết đánh giá'),
+                  icon: Icon(Icons.edit, size: 14), // GIẢM KÍCH THƯỚC ICON
+                  label: Text(
+                    'Viết đánh giá',
+                    style: TextStyle(fontSize: 12), // GIẢM FONT SIZE
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Color(0xFFC44536),
                     foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6), // GIẢM PADDING
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(6), // GIẢM BORDER RADIUS
                     ),
                   ),
                 ),
               ],
             ),
           ),
+
+          // NỘI DUNG ĐÁNH GIÁ
           Expanded(
             child: _buildReviewsContent(),
           ),
@@ -570,7 +588,6 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
       ),
     );
   }
-
   Widget _buildServicesContent() {
     final dichVuKhac = widget.coSoData['dich_vu_khac'] as List<dynamic>?;
 
@@ -587,7 +604,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
     }
 
     return ListView.builder(
-      padding: EdgeInsets.all(16),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12), // GIẢM PADDING
       itemCount: dichVuKhac.length,
       itemBuilder: (context, index) {
         final dichVu = dichVuKhac[index] as Map<String, dynamic>;
@@ -599,8 +616,8 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
         final giaInt = gia is int ? gia : (gia as num).toInt();
 
         return Container(
-          margin: EdgeInsets.only(bottom: 12),
-          padding: EdgeInsets.all(16),
+          margin: EdgeInsets.only(bottom: 8), // GIẢM MARGIN
+          padding: EdgeInsets.all(12), // GIẢM PADDING
           decoration: BoxDecoration(
             color: Color(0xFFF8F9FA),
             borderRadius: BorderRadius.circular(12),
@@ -609,14 +626,14 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
           child: Row(
             children: [
               Container(
-                padding: EdgeInsets.all(12),
+                padding: EdgeInsets.all(10), // GIẢM PADDING
                 decoration: BoxDecoration(
                   color: Color(0xFFC44536).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.room_service, color: Color(0xFFC44536), size: 24),
+                child: Icon(Icons.room_service, color: Color(0xFFC44536), size: 20), // GIẢM KÍCH THƯỚC ICON
               ),
-              SizedBox(width: 16),
+              SizedBox(width: 12), // GIẢM KHOẢNG CÁCH
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -624,16 +641,16 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                     Text(
                       ten,
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 15, // GIẢM FONT SIZE
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF2C3E50),
                       ),
                     ),
-                    SizedBox(height: 4),
+                    SizedBox(height: 2), // GIẢM KHOẢNG CÁCH
                     Text(
                       '${_formatCurrency(giaInt)}đ',
                       style: TextStyle(
-                        fontSize: 15,
+                        fontSize: 14, // GIẢM FONT SIZE
                         fontWeight: FontWeight.bold,
                         color: Color(0xFFC44536),
                       ),
@@ -812,7 +829,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                       Text(
                         'Đặt lịch',
                         style: TextStyle(
-                          fontSize: 9,
+                          fontSize: 10,
                           color: Color(0xFF2C3E50),
                           fontWeight: FontWeight.w500,
                         ),
@@ -947,18 +964,18 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             ),
           ),
 
-          // Logo và thông tin
+          // Logo và thông tin - BỐ CỤC MỚI
           Container(
             padding: EdgeInsets.all(16),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Logo
+                // CỘT 1: LOGO
                 GestureDetector(
                   onTap: logoImage != null ? () => _showImageFullScreen(logoImage!) : null,
                   child: Container(
-                    width: 80,
-                    height: 80,
+                    width: 65,
+                    height: 65,
                     margin: EdgeInsets.only(right: 16),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
@@ -984,65 +1001,87 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                   ),
                 ),
 
-                // Thông tin và địa chỉ với nút chỉ đường
+                // CỘT 2: THÔNG TIN CHI TIẾT
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // HÀNG 1: TÊN SÂN
                       Text(
                         ten,
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF2C3E50),
                         ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       SizedBox(height: 8),
 
-                      // Địa chỉ và nút chỉ đường
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Color(0xFFF8F9FA),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Color(0xFFECF0F1)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.location_on, size: 16, color: Color(0xFF7F8C8D)),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '${widget.coSoData['dia_chi_chi_tiet'] ?? ''}, ${widget.coSoData['xa'] ?? ''}, ${widget.coSoData['huyen'] ?? ''}, ${widget.coSoData['tinh'] ?? ''}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Color(0xFF2C3E50),
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                      // HÀNG 2: ĐỊA CHỈ VÀ NÚT CHỈ ĐƯỜNG (2 CỘT)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // CỘT 2.1: ĐỊA CHỈ
+                          Expanded(
+                            child: Text(
+                              '${widget.coSoData['dia_chi_chi_tiet'] ?? ''}, ${widget.coSoData['xa'] ?? ''}, ${widget.coSoData['huyen'] ?? ''}, ${widget.coSoData['tinh'] ?? ''}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF7F8C8D),
+                                height: 1.3,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            SizedBox(width: 8),
-                            Container(
-                              width: 32,
-                              height: 32,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  onTap: _openGoogleMaps,
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Color(0xFFC44536),
-                                      borderRadius: BorderRadius.circular(6),
+                          ),
+                          // CỘT 2.2: NÚT CHỈ ĐƯỜNG
+                          SizedBox(width: 8),
+                          Container(
+                            width: 50,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 35,
+                                  height: 35,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: _openGoogleMaps,
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Color(0xFFC44536),
+                                          borderRadius: BorderRadius.circular(8),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Color(0xFFC44536).withOpacity(0.3),
+                                              blurRadius: 4,
+                                              offset: Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Icon(Icons.navigation, size: 22, color: Colors.white),
+                                      ),
                                     ),
-                                    child: Icon(Icons.navigation, size: 18, color: Colors.white),
                                   ),
                                 ),
-                              ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Chỉ đường',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF2C3E50),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1695,7 +1734,9 @@ class _ReviewDialogState extends State<ReviewDialog> {
   }
 
   Future<void> _submitReview() async {
-    if (_controller.text.trim().isEmpty) {
+    if (_controller.text
+        .trim()
+        .isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Vui lòng nhập nội dung đánh giá'),
@@ -1767,92 +1808,155 @@ class _ReviewDialogState extends State<ReviewDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.symmetric(horizontal: 20),
-      child: Padding(
-        padding: EdgeInsets.all(20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Icon(Icons.star, color: Color(0xFFC44536)),
-                SizedBox(width: 8),
-                Text(
-                  'Đánh giá cơ sở',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2C3E50),
-                  ),
+            // HEADER VỚI MÀU NỀN KHÁC
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Color(0xFFC44536),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
                 ),
-              ],
-            ),
-            SizedBox(height: 16),
-            Text('Chọn số sao:', style: TextStyle(color: Color(0xFF2C3E50))),
-            SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (index) {
-                return IconButton(
-                  icon: Icon(
-                    index < _rating ? Icons.star : Icons.star_border,
-                    color: Colors.amber,
-                    size: 32,
-                  ),
-                  onPressed: () => setState(() => _rating = index + 1),
-                );
-              }),
-            ),
-            SizedBox(height: 16),
-            TextField(
-              controller: _controller,
-              decoration: InputDecoration(
-                labelText: 'Nội dung đánh giá',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                enabled: !_isSubmitting,
               ),
-              maxLines: 4,
+              child: Row(
+                children: [
+                  //Icon(Icons.star, color: Colors.white, size: 24),
+                  SizedBox(width: 8),
+                  Text(
+                    'Đánh giá cơ sở',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Color(0xFF2C3E50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+
+            // PHẦN THÂN VỚI NỀN TRẮNG
+            Padding(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // HÀNG "CHỌN SỐ SAO" VÀ CÁC NGÔI SAO CÙNG MỘT HÀNG
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Số sao:',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2C3E50),
+                        ),
                       ),
-                    ),
-                    child: Text('Hủy'),
+                      SizedBox(width: 12),
+                      // CÁC NGÔI SAO
+                      Row(
+                        children: List.generate(5, (index) {
+                          return IconButton(
+                            icon: Icon(
+                              index < _rating ? Icons.star : Icons.star_border,
+                              color: Colors.amber,
+                              size: 25,
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(
+                              minWidth: 29,
+                              minHeight: 29,
+                            ),
+                            onPressed: () => setState(() => _rating = index + 1),
+                          );
+                        }),
+                      ),
+                    ],
                   ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : _submitReview,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFFC44536),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
+
+                  SizedBox(height: 16),
+
+                  TextField(
+                    controller: _controller,
+                    decoration: InputDecoration(
+                      labelText: 'Nội dung đánh giá',
+                      labelStyle: TextStyle(color: Color(0xFF7F8C8D)),
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Color(0xFFBDC3C7)),
                       ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Color(0xFFC44536)),
+                      ),
+                      enabled: !_isSubmitting,
                     ),
-                    child: _isSubmitting
-                        ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                        : Text('Gửi đánh giá'),
+                    maxLines: 4,
                   ),
-                ),
-              ],
+
+                  SizedBox(height: 20),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Color(0xFF2C3E50),
+                            side: BorderSide(color: Color(0xFFBDC3C7)),
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text('Hủy'),
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isSubmitting ? null : _submitReview,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFFC44536),
+                            foregroundColor: Colors.white,
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: _isSubmitting
+                              ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                              : Text('Gửi đánh giá'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
