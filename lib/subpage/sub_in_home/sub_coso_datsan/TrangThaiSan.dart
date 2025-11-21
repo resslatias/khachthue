@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'OrderHashHelper.dart';
+import 'PayOS Service.dart';
 import 'thanhtoan.dart';
 
 class TrangThaiSan extends StatefulWidget {
@@ -32,7 +33,10 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
   StreamSubscription<QuerySnapshot>? subscription;
   Timer? _rollbackTimer;
   bool isLoading = true;
-  bool isProcessingPayment = false; // ✅ THÊM BIẾN NÀY
+  bool isProcessingPayment = false;
+  String _userName = '';
+  String _userPhone = '';
+  bool _isLoadingUserInfo = true;
 
   String formatDate(DateTime date) => DateFormat('dd_MM_yyyy').format(date);
   String displayDate(DateTime date) => DateFormat('dd/MM/yyyy').format(date);
@@ -42,7 +46,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     if (selectedDate.year == now.year &&
         selectedDate.month == now.month &&
         selectedDate.day == now.day) {
-      return hour < now.hour;
+      return hour <= now.hour;
     }
     return false;
   }
@@ -77,9 +81,40 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     );
   }
 
+  // Hàm load thông tin user từ Firestore
+  Future<void> _loadUserInfo() async {
+    try {
+      final userId = auth.currentUser?.uid;
+      if (userId == null) {
+        setState(() => _isLoadingUserInfo = false);
+        return;
+      }
+
+      final userDoc = await firestore.collection('users').doc(userId).get();
+
+      if (userDoc.exists) {
+        final userData = userDoc.data();
+        setState(() {
+          _userName = userData?['ten'] ?? userData?['name'] ?? '';
+          _userPhone = userData?['sdt'] ?? userData?['phone'] ?? '';
+          _isLoadingUserInfo = false;
+        });
+
+        debugPrint('✅ Đã load thông tin user: $_userName - $_userPhone');
+      } else {
+        setState(() => _isLoadingUserInfo = false);
+        debugPrint('⚠️ Không tìm thấy thông tin user');
+      }
+    } catch (e) {
+      setState(() => _isLoadingUserInfo = false);
+      debugPrint('🔥 Lỗi load thông tin user: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _loadUserInfo();
     _initializeData();
     WidgetsBinding.instance.addObserver(this);
   }
@@ -98,6 +133,8 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
 
     setState(() => isLoading = false);
   }
+
+
 
   Future<void> ensureDayDataExists(String datePath) async {
     final dateRef = firestore
@@ -122,7 +159,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         debugPrint("✅ Đã tạo dữ liệu cho ngày $datePath");
       }
     } catch (e) {
-      debugPrint("🔥 Lỗi ensureDayDataExists: $e");
+      debugPrint(" Lỗi ensureDayDataExists: $e");
     }
   }
 
@@ -200,6 +237,8 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       }
     }
   }
+
+
 
   Future<void> datSan(int hour, int index) async {
     String datePath = formatDate(selectedDate);
@@ -391,8 +430,9 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         .map((p) => "Sân ${p['san'] + 1} lúc ${p['hour']}-${p['hour'] + 1}h (${_formatCurrency(getPriceForHour(p['hour']))}đ)")
         .join("\n");
 
-    TextEditingController nameController = TextEditingController();
-    TextEditingController phoneController = TextEditingController();
+    // TỰ ĐỘNG ĐIỀN THÔNG TIN USER VÀO TextField
+    TextEditingController nameController = TextEditingController(text: _userName);
+    TextEditingController phoneController = TextEditingController(text: _userPhone);
 
     bool? confirmed = await showDialog<bool>(
       context: context,
@@ -465,25 +505,38 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
                 ),
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: "Tên người đặt *",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  prefixIcon: const Icon(Icons.person),
+
+// Hiển thị loading hoặc form nhập thông tin
+              _isLoadingUserInfo
+                  ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: CircularProgressIndicator(color: Color(0xFFC44536)),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneController,
-                decoration: InputDecoration(
-                  labelText: "Số điện thoại *",
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  prefixIcon: const Icon(Icons.phone),
-                  hintText: "0xxxxxxxxx",
-                ),
-                keyboardType: TextInputType.phone,
-                maxLength: 10,
+              )
+                  : Column(
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: "Tên người đặt *",
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      prefixIcon: const Icon(Icons.person),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: phoneController,
+                    decoration: InputDecoration(
+                      labelText: "Số điện thoại *",
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      prefixIcon: const Icon(Icons.phone),
+                      hintText: "0xxxxxxxxx",
+                    ),
+                    keyboardType: TextInputType.phone,
+                    maxLength: 10,
+                  ),
+                ],
               ),
             ],
           ),
@@ -494,7 +547,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
             child: const Text("Hủy"),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: _isLoadingUserInfo ? null : () {
               String name = nameController.text.trim();
               String phone = phoneController.text.trim();
 
@@ -530,11 +583,11 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       ),
     );
 
-    // ✅ BẮT ĐẦU XỬ LÝ THANH TOÁN
+//  BẮT ĐẦU XỬ LÝ PAYOS
     if (confirmed == true) {
       setState(() => isProcessingPayment = true);
 
-      await _processBooking(
+      await _processBookingWithPayOS(
         nameController.text.trim(),
         phoneController.text.trim(),
         validChanges,
@@ -552,7 +605,8 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     setState(() {});
   }
 
-  Future<void> _processBooking(
+  //  XỬ LÝ ĐẶT SÂN VỚI PAYOS
+  Future<void> _processBookingWithPayOS(
       String name,
       String phone,
       List<Map<String, dynamic>> validChanges,
@@ -564,17 +618,72 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       String ngayDat = formatDate(selectedDate);
       String userId = auth.currentUser?.uid ?? 'khachquaduong';
 
-      final donDatRef = await firestore.collection('temp_order').add({'temp': true});
-      String maDon = donDatRef.id;
-      await donDatRef.delete();
+      // Tạo mô tả đơn hàng
+      String danhSachSan = validChanges
+          .map((p) => "Sân ${p['san'] + 1} lúc ${p['hour']}-${p['hour'] + 1}h")
+          .join(", ");
 
-      debugPrint("✅ Đang xử lý đơn hàng: $maDon");
+      String description = "${widget.coSoData['ten']} - $danhSachSan";
 
-      DateTime timeoutTime = DateTime.now().add(const Duration(minutes: 15));
-      Timestamp timeoutTimestamp = Timestamp.fromDate(timeoutTime);
+      print('🔄 Đang tạo payment link với PayOS...');
+      print('💰 Amount: $tongTien');
+      print('📝 Description: $description');
+
+      //  TẠO PAYMENT LINK VỚI PAYOS
+      final paymentData = await PayOSService.createPaymentLink(
+        coSoData: widget.coSoData,
+        amount: tongTien,
+        description: description,
+        returnUrl: 'myapp://payment-success',
+        cancelUrl: 'myapp://payment-cancel',
+      );
+
+      if (paymentData == null) {
+        throw Exception('Không thể tạo payment link từ PayOS. Vui lòng thử lại.');
+      }
+
+      print('✅ PayOS payment data: $paymentData');
+
+      //  LẤY DỮ LIỆU TỪ PAYOS
+      String maDon = paymentData['orderCode']?.toString() ??
+          DateTime.now().millisecondsSinceEpoch.toString();
+      String checkoutUrl = paymentData['checkoutUrl'] ?? '';
+      String qrCodeUrl = paymentData['qrCode'] ?? '';
+
+      //  XỬ LÝ expiredAt (có thể là seconds hoặc milliseconds)
+      dynamic expiredAtValue = paymentData['expiredAt'];
+      int expiredAt;
+
+      if (expiredAtValue is int) {
+        // Kiểm tra xem là seconds hay milliseconds
+
+        if (expiredAtValue > 1000000000000) { // milliseconds
+          expiredAt = expiredAtValue;
+        } else { // seconds
+          expiredAt = expiredAtValue * 1000;
+        }
+      } else {
+        // Mặc định 15 phút
+        expiredAt = DateTime.now().add(Duration(minutes: 15)).millisecondsSinceEpoch;
+      }
+
+      DateTime expiredDateTime = DateTime.fromMillisecondsSinceEpoch(expiredAt);
+      Timestamp expiredTimestamp = Timestamp.fromDate(expiredDateTime);
+
+      print('📋 Payment Info:');
+      print('   - OrderCode: $maDon');
+      print('   - CheckoutUrl: $checkoutUrl');
+      print('   - QR Code: $qrCodeUrl');
+      print('   - ExpiredAt: $expiredDateTime');
+
+      // Kiểm tra dữ liệu bắt buộc
+      if (checkoutUrl.isEmpty) {
+        throw Exception('PayOS không trả về checkout URL');
+      }
 
       List<Map<String, dynamic>> danhSachDat = [];
 
+      // Cập nhật trạng thái sân lên 3
       for (var p in validChanges) {
         String sanKey = p['sanKey'];
         String tempTimeupKey = p['tempTimeupKey'];
@@ -584,7 +693,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         await (p['ref'] as DocumentReference).update({
           sanKey: 3,
           tempTimeupKey: null,
-          paymentTimeupKey: timeoutTimestamp,
+          paymentTimeupKey: expiredTimestamp, // Dùng expiredAt từ PayOS
         });
 
         debugPrint("✅ Đã cập nhật ${p['sanKey']}: 2→3");
@@ -596,19 +705,23 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
           'gia': getPriceForHour(p['hour']),
         });
       }
+
+      // Tạo order hash (vẫn cần cho tra cứu nhanh)
       final orderHash = OrderHashHelper.generateHash(userId, maDon);
       debugPrint("✅ Order hash: $orderHash");
 
-      await firestore.collection('order_lookup').doc(orderHash).set({
+      // Lưu order_lookup
+      await firestore.collection('order_lookup').doc(maDon).set({
         'user_id': userId,
         'ma_don': maDon,
+        'co_so_id': widget.coSoId,
+        'order_hash': orderHash,
         'created_at': FieldValue.serverTimestamp(),
         'trang_thai': 'chua_thanh_toan',
       });
-      debugPrint("✅ Đã lưu order_lookup/$orderHash");
+      debugPrint("✅ Đã lưu order_lookup/$maDon");
 
-      debugPrint("✅ Đã update trạng thái sân");
-
+      // Lưu đơn vào lich_su_khach
       Map<String, dynamic> donDatDataKhach = {
         'ma_don': maDon,
         'co_so_id': widget.coSoId,
@@ -620,8 +733,10 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         'tong_tien': tongTien,
         'trang_thai': 'chua_thanh_toan',
         'ngay_dat': ngayDat,
-        'timeup': timeoutTimestamp,
+        'timeup': expiredTimestamp, // Dùng expiredAt từ PayOS
         'order_hash': orderHash,
+        'checkout_url': checkoutUrl, // ✅ Lưu checkout URL
+        'qr_code_url': qrCodeUrl, // ✅ Lưu QR code URL
       };
 
       await firestore
@@ -633,6 +748,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
 
       debugPrint("✅ Đã lưu vào lich_su_khach");
 
+      // Lưu vào lich_su_san
       Map<String, dynamic> donDatDataSan = {
         'ma_don': maDon,
         'user_id_dat': userId,
@@ -644,7 +760,9 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
         'tong_tien': tongTien,
         'trang_thai': 'chua_thanh_toan',
         'ngay_dat': ngayDat,
-        'timeup': timeoutTimestamp,
+        'timeup': expiredTimestamp,
+        'checkout_url': checkoutUrl,
+        'qr_code_url': qrCodeUrl,
       };
 
       await firestore
@@ -656,6 +774,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
 
       debugPrint("✅ Đã lưu vào lich_su_san");
 
+      // Lưu chi tiết đặt
       WriteBatch batch = firestore.batch();
       for (var detail in danhSachDat) {
         final detailRef = firestore
@@ -669,28 +788,28 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
 
       debugPrint("✅ Đã lưu chi tiết đặt");
 
-      String danhSachSan = validChanges
-          .map((p) => "Sân ${p['san'] + 1} lúc ${p['hour']}-${p['hour'] + 1}h")
-          .join(", ");
-
+      // Gửi thông báo
       await firestore
           .collection('thong_bao')
           .doc(userId)
           .collection('notifications')
           .add({
         'tieu_de': 'Đặt sân thành công',
-        'noi_dung': 'Bạn đã đặt $danhSachSan tại ${widget.coSoData['ten']}',
+        'noi_dung': 'Bạn đã đặt $danhSachSan tại ${widget.coSoData['ten']}. Vui lòng thanh toán trong 15 phút.',
         'da_xem_chua': false,
-        'Urlweb': null,
-        'Urlimage': null,
+        'Urlweb': checkoutUrl,
+        'Urlimage': qrCodeUrl,
         'ngay_tao': FieldValue.serverTimestamp(),
       });
 
       _rollbackTimer?.cancel();
 
       if (mounted) {
-        _showSnackBar('Đặt sân thành công!', Color(0xFF2E8B57));
+        _showSnackBar('Đặt sân thành công! Đang chuyển đến trang thanh toán...', Color(0xFF2E8B57));
       }
+
+      //  CHUYỂN ĐẾN TRANG THANH TOÁN
+      await Future.delayed(Duration(milliseconds: 500));
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -701,13 +820,17 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
       }
 
     } catch (e, stackTrace) {
-      debugPrint("🔥 Lỗi confirm: $e");
+      debugPrint("🔥 Lỗi xử lý thanh toán PayOS: $e");
       debugPrint("Stack trace: $stackTrace");
 
       if (mounted) {
-        _showSnackBar("Lỗi xác nhận: $e", Color(0xFFC44536));
+        _showSnackBar("Lỗi thanh toán: ${e.toString()}", Color(0xFFC44536));
       }
+
+      // Rollback các thay đổi nếu có lỗi
+      await rollbackPending();
     }
+
   }
 
   void _showSnackBar(String message, Color color) {
@@ -806,7 +929,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     );
   }
 
-  // ✅ HEADER ĐÃ GIẢM PADDING
+  //  HEADER ĐÃ GIẢM PADDING
   Widget _buildCustomAppBar() {
     return Container(
       padding: EdgeInsets.only(
@@ -851,7 +974,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     );
   }
 
-  // ✅ DATE SELECTOR ĐÃ GIẢM PADDING
+  //  DATE SELECTOR ĐÃ GIẢM PADDING
   Widget _buildDateSelector() {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -1055,13 +1178,12 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     );
   }
 
-  // ✅ BOTTOM BAR ĐÃ TỐI ƯU - SÁT BOTTOM NAVIGATION & VÔ HIỆU HÓA KHI PROCESSING
+  //  BOTTOM BAR ĐÃ TỐI ƯU - SÁT BOTTOM NAVIGATION & VÔ HIỆU HÓA KHI PROCESSING
   Widget _buildBottomBar() {
     int tongTien = 0;
     for (var p in pendingChanges) {
       tongTien += getPriceForHour(p['hour']);
     }
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -1177,6 +1299,7 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     );
   }
 
+  // khi thoát nê có sân để thông báo
   Future<void> _handleBackPressed() async {
     if (pendingChanges.isNotEmpty) {
       bool? shouldBack = await showDialog<bool>(
@@ -1212,9 +1335,11 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
     }
   }
 
+
+  // hàm dọn dẹp nếu thoát giữa chừng
   Future<void> _cleanupAllExpiredCourts() async {
     try {
-      debugPrint("🔄 Đang dọn dẹp toàn bộ sân hết hạn...");
+      debugPrint(" Đang dọn dẹp toàn bộ sân hết hạn...");
 
       final now = DateTime.now();
       final today = formatDate(DateTime.now());
@@ -1276,12 +1401,12 @@ class _TrangThaiSanState extends State<TrangThaiSan> with WidgetsBindingObserver
   }
 }
 
+//  hiện trạng thái sân
+
 class _LegendItem extends StatelessWidget {
   final Color color;
   final String text;
-
   const _LegendItem({required this.color, required this.text});
-
   @override
   Widget build(BuildContext context) {
     return Row(

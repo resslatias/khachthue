@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
-
 import 'OrderHashHelper.dart';
 
 class ThanhToanPage extends StatefulWidget {
@@ -33,7 +34,7 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
     _startAutoRefresh();
   }
 
-  // 🔄 TỰ ĐỘNG REFRESH MỖI 10 GIÂY
+  // TỰ ĐỘNG REFRESH MỖI 10 GIÂY
   void _startAutoRefresh() {
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (mounted) {
@@ -65,7 +66,7 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
 
           if (i < 2) {
             await Future.delayed(const Duration(seconds: 1));
-            debugPrint("🔄 Retry loading order data...");
+            debugPrint(" Retry loading order data...");
           }
         } catch (e) {
           debugPrint("Lỗi lần $i: $e");
@@ -102,12 +103,11 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
         });
       }
 
-      // ✅ Kiểm tra nếu đã thanh toán thì dừng auto-refresh
+      //  Kiểm tra nếu đã thanh toán thì dừng auto-refresh
       if (donDatData!['trang_thai'] == 'da_thanh_toan') {
         _autoRefreshTimer?.cancel();
-        debugPrint("✅ Đơn hàng đã thanh toán - Dừng auto-refresh");
+        debugPrint(" Đơn hàng đã thanh toán - Dừng auto-refresh");
       }
-
     } catch (e) {
       debugPrint("Lỗi load order: $e");
       if (showLoading) {
@@ -125,30 +125,14 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
     }
   }
 
-  // 🔗 TẠO URL QR CODE VIETQR
+  // taoQR thanh toans
   String _generateQRUrl() {
-    /*final tongTien = (donDatData!['tong_tien'] as num?)?.toInt() ?? 0;
-
-    final maDon = widget.maDon;
-    final userId = auth.currentUser?.uid ?? "khachquaduong";
-
-    // Lấy 10 ký tự đầu UID và 10 ký tự đầu mã đơn
-    ///final uidShort = userId.length > 10 ? userId.substring(0, 10) : userId;
-    ///final maDonShort = maDon.length > 10 ? maDon.substring(0, 10) : maDon;
-
-    final addInfo = 'USE${userId}DON${maDon}END';
-
-    return 'https://api.vietqr.io/image/963388-0868089513-bl9RhYA.jpg'
-        '?amount=$tongTien&addInfo=$addInfo';*/
     final tongTien = (donDatData!['tong_tien'] as num?)?.toInt() ?? 0;
-
     // Lấy hash từ dữ liệu đơn
     final orderHash = donDatData!['order_hash'] as String? ?? '';
-
     // Format addInfo ngắn gọn
     final addInfo = OrderHashHelper.formatAddInfo(orderHash);
     // VD: "PAYA7F3E9B2" - chỉ 11 ký tự!
-
     return 'https://api.vietqr.io/image/963388-0868089513-bl9RhYA.jpg'
         '?amount=$tongTien&addInfo=$addInfo';
   }
@@ -180,7 +164,8 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
   Widget build(BuildContext context) {
     if (isLoading) {
       return Scaffold(
-        body: Center(child: CircularProgressIndicator(color: Color(0xFFC44536))),
+        body: Center(
+            child: CircularProgressIndicator(color: Color(0xFFC44536))),
       );
     }
 
@@ -198,7 +183,8 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
     return Scaffold(
       body: Column(
         children: [
-          // Simple Header thay cho AppBar
+
+
           Container(
             padding: EdgeInsets.only(top: 8, left: 16, right: 16, bottom: 8),
             decoration: BoxDecoration(
@@ -266,8 +252,12 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
   }
 
   Widget _buildStatusCard(String trangThai) {
-    Color statusColor = trangThai == 'da_thanh_toan' ? Color(0xFF2E8B57) : Color(0xFFF39C12);
-    String statusText = trangThai == 'da_thanh_toan' ? 'Đã thanh toán' : 'Chờ thanh toán';
+    Color statusColor = trangThai == 'da_thanh_toan'
+        ? Color(0xFF2E8B57)
+        : Color(0xFFF39C12);
+    String statusText = trangThai == 'da_thanh_toan'
+        ? 'Đã thanh toán'
+        : 'Chờ thanh toán';
 
     return Container(
       width: double.infinity,
@@ -448,7 +438,8 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
   }
 
   Widget _buildQRCodeCard() {
-    final qrUrl = _generateQRUrl();
+    final qrUrl = donDatData!['qr_code_url'] as String? ?? '';
+    final checkoutUrl = donDatData!['checkout_url'] as String? ?? '';
     final tongTien = (donDatData!['tong_tien'] as num?)?.toInt() ?? 0;
 
     return Container(
@@ -471,50 +462,66 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
           ),
           SizedBox(height: 16),
 
-          // QR Code
-          Container(
-            padding: EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: Color(0xFFECF0F1)),
-              borderRadius: BorderRadius.circular(8),
+          //  THAY THẾ Image.network BẰNG QR WIDGET
+          if (qrUrl.isNotEmpty)
+            Container(
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                border: Border.all(color: Color(0xFFECF0F1)),
+                borderRadius: BorderRadius.circular(8),
+                color: Colors.white,
+              ),
+              child: QrImageView(
+                data: qrUrl,
+                version: QrVersions.auto,
+                size: 200,
+                backgroundColor: Colors.white,
+                errorCorrectionLevel: QrErrorCorrectLevel.M,
+                padding: EdgeInsets.all(8),
+              ),
             ),
-            child: Image.network(
-              qrUrl,
-              width: 200,
-              height: 200,
-              fit: BoxFit.contain,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return SizedBox(
-                  width: 200,
-                  height: 200,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFFC44536),
-                    ),
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  width: 200,
-                  height: 200,
-                  alignment: Alignment.center,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, color: Colors.red, size: 40),
-                      SizedBox(height: 8),
-                      Text('Lỗi tải mã QR'),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
+
           SizedBox(height: 16),
 
-          // Thông tin chuyển khoản
+          // Nút mở PayOS Checkout
+          if (checkoutUrl.isNotEmpty)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  try {
+                    final uri = Uri.parse(checkoutUrl);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(
+                        uri,
+                        mode: LaunchMode.externalApplication,
+                      );
+                    } else {
+                      _showMessage('Không thể mở trang thanh toán');
+                    }
+                  } catch (e) {
+                    _showMessage('Lỗi: $e');
+                  }
+                },
+                icon: Icon(Icons.payment, size: 20),
+                label: Text(
+                  'Mở trang thanh toán PayOS',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFF0068FF),
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+
+          SizedBox(height: 16),
+
+          // Thông tin thanh toán
           Container(
             width: double.infinity,
             padding: EdgeInsets.all(16),
@@ -525,21 +532,37 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Thông tin chuyển khoản:',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2C3E50),
-                  ),
+                Row(
+                  children: [
+                    Icon(
+                        Icons.info_outline, color: Color(0xFFC44536), size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Hướng dẫn thanh toán:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2C3E50),
+                      ),
+                    ),
+                  ],
                 ),
                 SizedBox(height: 12),
-                _buildBankInfoRow('Ngân hàng', 'Vietcombank'),
-                _buildBankInfoRow('Số tài khoản', '9915033623'),
-                _buildBankInfoRow('Số tiền', '${_formatCurrency(tongTien)}đ'),
-                _buildBankInfoRow('Nội dung', widget.maDon),
+                _buildInfoStep('1', 'Quét mã QR hoặc mở trang thanh toán'),
+                _buildInfoStep('2', 'Chọn phương thức thanh toán'),
+                _buildInfoStep('3', 'Xác nhận thanh toán'),
+                SizedBox(height: 8),
+                Text(
+                  'Số tiền: ${_formatCurrency(tongTien)}đ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFFC44536),
+                  ),
+                ),
               ],
             ),
           ),
+
           SizedBox(height: 12),
 
           // Auto refresh indicator
@@ -629,12 +652,15 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
               width: double.infinity,
               height: 50,
               decoration: BoxDecoration(
-                color: trangThai == 'da_thanh_toan' ? Color(0xFF2E8B57) : Color(0xFFC44536),
+                color: trangThai == 'da_thanh_toan' ? Color(0xFF2E8B57) : Color(
+                    0xFFC44536),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
                 child: Text(
-                  trangThai == 'da_thanh_toan' ? 'ĐÃ THANH TOÁN' : 'QUÉT MÃ QR ĐỂ THANH TOÁN!',
+                  trangThai == 'da_thanh_toan'
+                      ? 'ĐÃ THANH TOÁN'
+                      : 'QUÉT MÃ QR ĐỂ THANH TOÁN!',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -645,6 +671,59 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildInfoStep(String number, String text) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: Color(0xFFC44536),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              number,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(top: 2),
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF2C3E50),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// ✅ THÊM HÀM _showMessage() NẾU CHƯA CÓ
+  void _showMessage(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
