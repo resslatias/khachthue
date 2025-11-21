@@ -508,7 +508,7 @@ class _OptimizedHeaderSectionState extends State<OptimizedHeaderSection> {
           ),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(20, 50, 20, 20),
+      padding: const EdgeInsets.fromLTRB(20, 40, 20, 16),
       child: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         initialData: FirebaseAuth.instance.currentUser,
@@ -541,8 +541,8 @@ class _OptimizedHeaderSectionState extends State<OptimizedHeaderSection> {
     final avatarUrl = (_userProfile?['anh_dai_dien'] as String?) ?? '';
 
     return Container(
-      width: 50,
-      height: 50,
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(color: Colors.white, width: 2.5),
@@ -567,8 +567,8 @@ class _OptimizedHeaderSectionState extends State<OptimizedHeaderSection> {
 
   Widget _buildLogoPlaceholder() {
     return Container(
-      width: 50,
-      height: 50,
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: Colors.white.withOpacity(0.2),
@@ -584,7 +584,7 @@ class _OptimizedHeaderSectionState extends State<OptimizedHeaderSection> {
       child: Icon(
         Icons.sports_tennis,
         color: Colors.white,
-        size: 26,
+        size: 22,
       ),
     );
   }
@@ -613,7 +613,7 @@ class _OptimizedHeaderSectionState extends State<OptimizedHeaderSection> {
             'Xin chào!',
             style: TextStyle(
               color: Colors.white.withOpacity(0.9),
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -622,7 +622,7 @@ class _OptimizedHeaderSectionState extends State<OptimizedHeaderSection> {
             'KL10 - Đặt sân cầu lông',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -646,7 +646,7 @@ class _OptimizedHeaderSectionState extends State<OptimizedHeaderSection> {
           SizedBox(height: 4),
           Container(
             width: 120,
-            height: 18,
+            height: 16,
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.3),
               borderRadius: BorderRadius.circular(4),
@@ -732,7 +732,7 @@ class _HeaderButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: filled ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(20),

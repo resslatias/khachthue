@@ -59,7 +59,7 @@ class _HomePageContentState extends State<HomePageContent> {
     }
 
     if (filters.isEmpty) {
-      return 'Hiển thị tất cả cơ sở';
+      return 'Đang hiển thị tất cả cơ sở. Mở rộng menu tìm kiếm để tìm theo địa chỉ';
     }
 
     return 'Đang lọc theo: ${filters.join(", ")}';
@@ -75,6 +75,7 @@ class _HomePageContentState extends State<HomePageContent> {
     );
   }
 
+  /// phần tìm kiêếm
   Widget _buildFilterSection() {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -88,231 +89,225 @@ class _HomePageContentState extends State<HomePageContent> {
           ),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          Expanded(
-            child: Column(
+          // Hàng đầu tiên: ô tìm kiếm và các nút
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 36,
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Tìm tên sân...',
+                      prefixIcon: Icon(Icons.search, size: 20, color: Color(0xFF7F8C8D)),
+                      suffixIcon: _searchText.isNotEmpty
+                          ? IconButton(
+                        icon: Icon(Icons.clear, size: 18, color: Color(0xFF7F8C8D)),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchText = '');
+                        },
+                      )
+                          : null,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: Color(0xFFBDC3C7)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: Color(0xFFBDC3C7)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(color: Color(0xFFC44536)),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                      hintStyle: TextStyle(fontSize: 14, color: Color(0xFF95A5A6)),
+                    ),
+                    style: TextStyle(fontSize: 14),
+                    onChanged: (value) => setState(() => _searchText = value.trim()),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Nút toggle bộ lọc địa chỉ
+              Container(
+                width: 36,
+                height: 36,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      setState(() {
+                        _showLocationFilters = !_showLocationFilters;
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: _showLocationFilters
+                            ? Color(0xFFC44536).withOpacity(0.1)
+                            : Color(0xFFECF0F1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _showLocationFilters
+                              ? Color(0xFFC44536)
+                              : Color(0xFFBDC3C7),
+                        ),
+                      ),
+                      child: Icon(
+                        _showLocationFilters
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        color: _showLocationFilters
+                            ? Color(0xFFC44536)
+                            : Color(0xFF7F8C8D),
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 12),
+              Container(
+                width: 36,
+                height: 36,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LikePage()),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFECF0F1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Color(0xFFBDC3C7)),
+                      ),
+                      child: Icon(
+                        Icons.favorite,
+                        color: Color(0xFFC44536),
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Bộ lọc địa chỉ (ẩn/hiện) - NẰM DƯỚI Ô TÌM KIẾM
+          AnimatedCrossFade(
+            firstChild: SizedBox.shrink(),
+            secondChild: Column(
               children: [
-                // Ô tìm kiếm với nút dropdown
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
-                      child: Container(
-                        height: 36,
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            hintText: 'Tìm tên sân...',
-                            prefixIcon: Icon(Icons.search, size: 20, color: Color(0xFF7F8C8D)),
-                            suffixIcon: _searchText.isNotEmpty
-                                ? IconButton(
-                              icon: Icon(Icons.clear, size: 18, color: Color(0xFF7F8C8D)),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _searchText = '');
-                              },
-                            )
-                                : null,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(color: Color(0xFFBDC3C7)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(color: Color(0xFFBDC3C7)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(color: Color(0xFFC44536)),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                            hintStyle: TextStyle(fontSize: 14, color: Color(0xFF95A5A6)),
-                          ),
-                          style: TextStyle(fontSize: 14),
-                          onChanged: (value) => setState(() => _searchText = value.trim()),
-                        ),
+                      child: _buildSmallFilterField(
+                        controller: _xaController,
+                        hint: 'Xã',
+                        value: _selectedXa,
+                        onChanged: (v) => setState(() => _selectedXa = v.trim()),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Nút toggle bộ lọc địa chỉ
-                    Container(
-                      width: 36,
-                      height: 36,
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () {
-                            setState(() {
-                              _showLocationFilters = !_showLocationFilters;
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(10),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: _showLocationFilters
-                                  ? Color(0xFFC44536).withOpacity(0.1)
-                                  : Color(0xFFECF0F1),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: _showLocationFilters
-                                    ? Color(0xFFC44536)
-                                    : Color(0xFFBDC3C7),
-                              ),
-                            ),
-                            child: Icon(
-                              _showLocationFilters
-                                  ? Icons.keyboard_arrow_up
-                                  : Icons.keyboard_arrow_down,
-                              color: _showLocationFilters
-                                  ? Color(0xFFC44536)
-                                  : Color(0xFF7F8C8D),
-                              size: 20,
-                            ),
-                          ),
-                        ),
+                    Expanded(
+                      child: _buildSmallFilterField(
+                        controller: _huyenController,
+                        hint: 'Phường',
+                        value: _selectedHuyen,
+                        onChanged: (v) => setState(() => _selectedHuyen = v.trim()),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildSmallFilterField(
+                        controller: _tinhController,
+                        hint: 'Tỉnh',
+                        value: _selectedTinh,
+                        onChanged: (v) => setState(() => _selectedTinh = v.trim()),
                       ),
                     ),
                   ],
                 ),
-
-                // Dòng thông báo bộ lọc
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Color(0xFFF8F9FA),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Color(0xFFE9ECEF)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 14,
-                        color: Color(0xFF6C757D),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          _getFilterDescription(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF6C757D),
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Bộ lọc địa chỉ (ẩn/hiện)
-                AnimatedCrossFade(
-                  firstChild: SizedBox.shrink(),
-                  secondChild: Column(
-                    children: [
-                      const SizedBox(height: 10),
-                      Row(
+                if (_selectedTinh.isNotEmpty || _selectedHuyen.isNotEmpty || _selectedXa.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: GestureDetector(
+                      onTap: () {
+                        _tinhController.clear();
+                        _huyenController.clear();
+                        _xaController.clear();
+                        setState(() {
+                          _selectedTinh = '';
+                          _selectedHuyen = '';
+                          _selectedXa = '';
+                        });
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Expanded(
-                            child: _buildSmallFilterField(
-                              controller: _xaController,
-                              hint: 'Xã',
-                              value: _selectedXa,
-                              onChanged: (v) => setState(() => _selectedXa = v.trim()),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildSmallFilterField(
-                              controller: _huyenController,
-                              hint: 'Phường',
-                              value: _selectedHuyen,
-                              onChanged: (v) => setState(() => _selectedHuyen = v.trim()),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _buildSmallFilterField(
-                              controller: _tinhController,
-                              hint: 'Tỉnh',
-                              value: _selectedTinh,
-                              onChanged: (v) => setState(() => _selectedTinh = v.trim()),
+                          Icon(Icons.clear_all, size: 16, color: Color(0xFFC44536)),
+                          SizedBox(width: 4),
+                          Text(
+                            'Xóa bộ lọc địa chỉ',
+                            style: TextStyle(
+                              color: Color(0xFFC44536),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
                       ),
-                      if (_selectedTinh.isNotEmpty || _selectedHuyen.isNotEmpty || _selectedXa.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: GestureDetector(
-                            onTap: () {
-                              _tinhController.clear();
-                              _huyenController.clear();
-                              _xaController.clear();
-                              setState(() {
-                                _selectedTinh = '';
-                                _selectedHuyen = '';
-                                _selectedXa = '';
-                              });
-                            },
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.clear_all, size: 16, color: Color(0xFFC44536)),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Xóa bộ lọc địa chỉ',
-                                  style: TextStyle(
-                                    color: Color(0xFFC44536),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
-                  crossFadeState: _showLocationFilters
-                      ? CrossFadeState.showSecond
-                      : CrossFadeState.showFirst,
-                  duration: Duration(milliseconds: 300),
-                ),
               ],
             ),
+            crossFadeState: _showLocationFilters
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: Duration(milliseconds: 300),
           ),
 
-          SizedBox(width: 12),
+          // Dòng thông báo bộ lọc - TOÀN CHIỀU NGANG, CHỮ GIỮA - NẰM DƯỚI BỘ LỌC ĐỊA CHỈ
           Container(
-            width: 36,
-            height: 36,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const LikePage()),
-                  );
-                },
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Color(0xFFECF0F1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Color(0xFFBDC3C7)),
-                  ),
-                  child: Icon(
-                    Icons.favorite,
-                    color: Color(0xFFC44536),
-                    size: 20,
+            width: double.infinity, // CHIẾM TOÀN BỘ CHIỀU NGANG
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            margin: const EdgeInsets.only(top: 8),
+            decoration: BoxDecoration(
+              color: Color(0xFFF8F9FA),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Color(0xFFE9ECEF)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center, // CHỮ Ở GIỮA
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  size: 14,
+                  color: Color(0xFF6C757D),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _getFilterDescription(),
+                    textAlign: TextAlign.center, // CĂN GIỮA CHỮ
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6C757D),
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -440,7 +435,7 @@ class _HomePageContentState extends State<HomePageContent> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      height: 140,
+      height: 150,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -571,42 +566,51 @@ class _HomePageContentState extends State<HomePageContent> {
               // PHẦN THÔNG TIN
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        ten,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF2C3E50),
-                          height: 1.3,
+                      Container(
+                        constraints: BoxConstraints(maxHeight: 40), // THÊM DÒNG NÀY
+                        child: Text(
+                          ten,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2C3E50),
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
 
+
+
                       if (diaChi.isNotEmpty)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(Icons.location_on, size: 14, color: Color(0xFF7F8C8D)),
-                            SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                diaChi,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF7F8C8D),
-                                  height: 1.4,
+                        Container(
+                          constraints: BoxConstraints(maxHeight: 34), // THÊM DÒNG NÀY
+                          child:
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.location_on, size: 14, color: Color(0xFF7F8C8D)),
+                              SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  diaChi,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF7F8C8D),
+                                    height: 1.4,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
 
                       Row(

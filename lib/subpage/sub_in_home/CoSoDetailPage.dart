@@ -262,21 +262,49 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
     }
   }
 
-  void _showReviewDialog() {
+  void _showReviewDialog() async {
     final user = FirebaseAuth.instance.currentUser;
+
     if (user == null) {
-      _showMessage('Vui lòng đăng nhập để đánh giá');
+      _showMessage('Hãy đăng nhập trước');
       return;
     }
 
-    showDialog(
-      context: context,
-      builder: (ctx) => ReviewDialog(
-        coSoId: widget.coSoId,
-        coSoName: widget.coSoData['ten'] as String? ?? 'Cơ sở',
-        userId: user.uid,
-      ),
-    );
+    try {
+
+      // Kiểm tra xem user đã đặt sân tại cơ sở này chưa
+      final snapshot = await FirebaseFirestore.instance
+          .collection('lich_su_khach')
+          .doc(user.uid)
+          .collection('don_dat')
+          .where('co_so_id', isEqualTo: widget.coSoId)
+          .where('trang_thai', isEqualTo: 'da_thanh_toan')
+          .limit(1)
+          .get();
+
+
+      if (snapshot.docs.isEmpty) {
+        // Chưa từng đặt sân tại cơ sở này
+        _showMessage('Bạn cần đặt sân tại cơ sở này trước khi đánh giá');
+        return;
+      }
+
+      //  Đã đặt sân -> Hiển thị dialog đánh giá
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => ReviewDialog(
+            coSoId: widget.coSoId,
+            coSoName: widget.coSoData['ten'] as String? ?? 'Cơ sở', // SỬA LẠI CHO ĐÚNG
+            userId: user.uid,
+          ),
+        );
+      }
+    } catch (e) {
+      // Đóng loading dialog nếu có lỗi - ĐẢM BẢO LUÔN ĐÓNG KHI CÓ LỖI
+      if (mounted) Navigator.of(context).pop();
+      _showMessage('Lỗi kiểm tra lịch sử: $e');
+    }
   }
 
   String? _getLogoImage() {
@@ -508,12 +536,28 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                   onPressed: () => Navigator.pop(context),
                 ),
                 SizedBox(width: 8),
-                Text(
-                  'Đánh giá',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2C3E50),
+                Expanded(
+                  child: Text(
+                    'Các đánh giá',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2C3E50),
+                    ),
+                  ),
+                ),
+                // thêm đánh giá
+                ElevatedButton.icon(
+                  onPressed: _showReviewDialog,
+                  icon: Icon(Icons.edit, size: 16),
+                  label: Text('Viết đánh giá'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFFC44536),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ],
@@ -652,96 +696,158 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
 
     return Scaffold(
       backgroundColor: Color(0xFFECF0F1),
-      body: Stack(
+      body: Column(
         children: [
-          CustomScrollView(
-            slivers: [
-              // AppBar với tất cả các nút trên cùng 1 hàng
-              SliverAppBar(
-                backgroundColor: Colors.white,
-                elevation: 2,
-                pinned: true,
-                leading: IconButton(
+          // HEADER CUSTOM VỚI CÁC NÚT TRÊN CÙNG
+          Container(
+            //height: kToolbarHeight + MediaQuery.of(context).padding.top,
+            padding: EdgeInsets.only(
+              top: 10,
+              left: 8,
+              right: 8,
+              bottom: 8,
+            ),
+            color: Colors.white,
+            child: Row(
+              children: [
+                // Nút back
+                IconButton(
                   icon: Icon(Icons.arrow_back, color: Color(0xFF2C3E50)),
                   onPressed: () => Navigator.pop(context),
                 ),
-                title: Text(
-                  ten,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2C3E50),
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                actions: [
-                  // Nút yêu thích
-                  IconButton(
-                    icon: Icon(
-                      _isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: _isFavorite ? Color(0xFFC44536) : Color(0xFF2C3E50),
+                // Tiêu đề
+                Expanded(
+                  child: Text(
+                    ten,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2C3E50),
                     ),
-                    onPressed: _isLoadingFav ? null : _toggleFavorite,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  // Nút đánh giá
-                  IconButton(
-                    icon: Icon(Icons.star_border, color: Color(0xFF2C3E50)),
-                    onPressed: _showReviewDialog,
-                  ),
-                  // Nút đặt lịch
-                  IconButton(
-                    icon: Icon(Icons.calendar_today, color: Color(0xFF2C3E50)),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => TrangThaiSan(
-                            coSoId: widget.coSoId,
-                            coSoData: widget.coSoData,
+                ),
+                // Nút yêu thích
+                Container(
+                  width: 40,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _isLoadingFav ? null : _toggleFavorite,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: _isFavorite ? Color(0xFFC44536).withOpacity(0.1) : Color(0xFFECF0F1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _isFavorite ? Color(0xFFC44536) : Color(0xFFBDC3C7),
+                                ),
+                              ),
+                              child: Icon(
+                                _isFavorite ? Icons.favorite : Icons.favorite_border,
+                                color: _isFavorite ? Color(0xFFC44536) : Color(0xFF2C3E50),
+                                size: 18,
+                              ),
+                            ),
                           ),
                         ),
-                      );
-                    },
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Yêu thích',
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Color(0xFF2C3E50),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
-                  // Nút chỉ đường
-                  IconButton(
-                    icon: Icon(Icons.map, color: Color(0xFF2C3E50)),
-                    onPressed: _openGoogleMaps,
-                  ),
-                  SizedBox(width: 8),
-                ],
-              ),
-
-              // Ảnh bìa và logo
-              SliverToBoxAdapter(
-                child: _buildCoverSection(ten, logoImage, coverImage),
-              ),
-
-              // Gallery
-              if (galleryImages.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: _buildGallerySection(galleryImages),
                 ),
 
-              // Thông tin cơ bản
-              SliverToBoxAdapter(
-                child: _buildBasicInfoSection(),
-              ),
+                SizedBox(width: 8),
 
-              // Khoảng cách cuối để không bị che bởi bottom bar
-              SliverToBoxAdapter(
-                child: SizedBox(height: 80),
+                // Nút đặt lịch
+                Container(
+                  width: 50,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => TrangThaiSan(
+                                    coSoId: widget.coSoId,
+                                    coSoData: widget.coSoData,
+                                  ),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Color(0xFFECF0F1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Color(0xFFBDC3C7)),
+                              ),
+                              child: Icon(Icons.calendar_today, size: 18, color: Color(0xFF2C3E50)),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Đặt lịch',
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: Color(0xFF2C3E50),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // NỘI DUNG CHÍNH
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Ảnh bìa và logo (ĐÃ BỎ CÁC NÚT Ở ĐÂY)
+                  _buildCoverSection(ten, logoImage, coverImage),
+
+                  // Gallery
+                  if (galleryImages.isNotEmpty)
+                    _buildGallerySection(galleryImages),
+
+                  // Thông tin cơ bản
+                  _buildBasicInfoSection(),
+
+                  // Khoảng cách cuối để không bị che bởi bottom bar
+                  SizedBox(height: 80),
+                ],
               ),
-            ],
+            ),
           ),
 
           // Bottom bar cố định
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _buildBottomActionBar(),
-          ),
+          _buildBottomActionBar(),
         ],
       ),
     );
@@ -818,96 +924,134 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
 
   Widget _buildCoverSection(String ten, String? logoImage, String? coverImage) {
     return Container(
-        color: Colors.white,
-        margin: EdgeInsets.only(bottom: 8),
-        child: Column(
-            children: [
-        // Ảnh bìa
-        GestureDetector(
-        onTap: coverImage != null ? () => _showImageFullScreen(coverImage!) : null,
-    child: Container(
-    height: 200,
-    width: double.infinity,
-    decoration: BoxDecoration(
-    color: Color(0xFFBDC3C7),
-    ),
-    child: coverImage != null
-    ? Image.network(
-    coverImage,
-    fit: BoxFit.cover,
-    errorBuilder: (_, __, ___) => Icon(Icons.broken_image, size: 40),
-    )
-        : Icon(Icons.photo, size: 40, color: Colors.white),
-    ),
-    ),
-
-    // Logo và tên
-    Container(
-    padding: EdgeInsets.all(16),
-    child: Row(
-    children: [
-    // Logo
-    GestureDetector(
-    onTap: logoImage != null ? () => _showImageFullScreen(logoImage!) : null,
-    child: Container(
-    width: 80,
-    height: 80,
-    margin: EdgeInsets.only(right: 16),
-    decoration: BoxDecoration(
-    borderRadius: BorderRadius.circular(12),
-    color: Colors.white,
-    boxShadow: [
-    BoxShadow(
-    color: Colors.black26,
-    blurRadius: 8,
-    offset: Offset(0, 2),
-    ),
-    ],
-    ),
-      child: logoImage != null
-          ? ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          logoImage,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Icon(Icons.business, size: 40),
-        ),
-      )
-          : Icon(Icons.business, size: 40, color: Color(0xFFC44536)),
-    ),
-    ),
-
-      // Tên và thông tin
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              ten,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2C3E50),
+      color: Colors.white,
+      margin: EdgeInsets.only(bottom: 8),
+      child: Column(
+        children: [
+          // Ảnh bìa
+          GestureDetector(
+            onTap: coverImage != null ? () => _showImageFullScreen(coverImage!) : null,
+            child: Container(
+              height: 200,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Color(0xFFBDC3C7),
               ),
+              child: coverImage != null
+                  ? Image.network(
+                coverImage,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Icon(Icons.broken_image, size: 40),
+              )
+                  : Icon(Icons.photo, size: 40, color: Colors.white),
             ),
-            SizedBox(height: 4),
-            Text(
-              '${widget.coSoData['dia_chi_chi_tiet'] ?? ''}, ${widget.coSoData['xa'] ?? ''}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFF7F8C8D),
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+          ),
+
+          // Logo và thông tin
+          Container(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Logo
+                GestureDetector(
+                  onTap: logoImage != null ? () => _showImageFullScreen(logoImage!) : null,
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    margin: EdgeInsets.only(right: 16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: logoImage != null
+                        ? ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        logoImage,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Icon(Icons.business, size: 40),
+                      ),
+                    )
+                        : Icon(Icons.business, size: 40, color: Color(0xFFC44536)),
+                  ),
+                ),
+
+                // Thông tin và địa chỉ với nút chỉ đường
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ten,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2C3E50),
+                        ),
+                      ),
+                      SizedBox(height: 8),
+
+                      // Địa chỉ và nút chỉ đường
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Color(0xFFF8F9FA),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Color(0xFFECF0F1)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.location_on, size: 16, color: Color(0xFF7F8C8D)),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${widget.coSoData['dia_chi_chi_tiet'] ?? ''}, ${widget.coSoData['xa'] ?? ''}, ${widget.coSoData['huyen'] ?? ''}, ${widget.coSoData['tinh'] ?? ''}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF2C3E50),
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            SizedBox(width: 8),
+                            Container(
+                              width: 32,
+                              height: 32,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: _openGoogleMaps,
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Color(0xFFC44536),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Icon(Icons.navigation, size: 18, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    ],
-    ),
-    ),
-            ],
-        ),
     );
   }
 
@@ -1624,6 +1768,7 @@ class _ReviewDialogState extends State<ReviewDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: EdgeInsets.symmetric(horizontal: 20),
       child: Padding(
         padding: EdgeInsets.all(20),
         child: Column(
