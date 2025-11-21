@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../home.dart';
 import '../sub_in_home/CoSoDetailPage.dart';
+import '../sub_in_home/sub_coso_datsan/TrangThaiSan.dart';
 
 class LikePage extends StatefulWidget {
   const LikePage({super.key});
@@ -169,8 +170,10 @@ class _LikePageState extends State<LikePage> {
 
   // Widget thẻ cơ sở GIỐNG TRANG HOME - HIỂN THỊ CẢ 2 ẢNH
   Widget _buildCoSoCard(BuildContext context, String id, Map<String, dynamic> data) {
-    final anh1 = data['anh1'] as String? ?? '';
-    final anh2 = data['anh2'] as String? ?? '';
+    final anh1 = data['anh_dai_dien'] as String? ?? '';
+    final danhSachAnh = data['danh_sach_anh'] as List<dynamic>? ?? [];
+    final anh2 = danhSachAnh.isNotEmpty ? danhSachAnh[0] as String : '';
+
     final ten = data['ten'] as String? ?? 'Chưa có tên';
     final diaChiChiTiet = data['dia_chi_chi_tiet'] as String? ?? '';
     final xa = data['xa'] as String? ?? '';
@@ -185,7 +188,7 @@ class _LikePageState extends State<LikePage> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      height: 140,
+      height: 150,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -210,7 +213,7 @@ class _LikePageState extends State<LikePage> {
           borderRadius: BorderRadius.circular(12),
           child: Row(
             children: [
-              // PHẦN ẢNH: Hiển thị cả ảnh bìa (anh2) và logo (anh1) - GIỐNG HOME
+              // PHẦN ẢNH
               Container(
                 width: 140,
                 height: double.infinity,
@@ -223,7 +226,6 @@ class _LikePageState extends State<LikePage> {
                 ),
                 child: Stack(
                   children: [
-                    // Ảnh bìa (anh2) - background
                     if (anh2.isNotEmpty)
                       ClipRRect(
                         borderRadius: BorderRadius.only(
@@ -241,7 +243,6 @@ class _LikePageState extends State<LikePage> {
                     else
                       _buildPlaceholderBanner(),
 
-                    // Logo (anh1) - overlay ở góc dưới phải
                     Positioned(
                       bottom: 8,
                       right: 8,
@@ -273,7 +274,6 @@ class _LikePageState extends State<LikePage> {
                       ),
                     ),
 
-                    // Badge is_oke - góc trên trái
                     Positioned(
                       top: 8,
                       left: 8,
@@ -310,10 +310,11 @@ class _LikePageState extends State<LikePage> {
                             ),
                           ],
                         ),
+
+
                       ),
                     ),
-
-                    // Nút xóa yêu thích - góc trên phải
+                    // Thêm đoạn này vào Stack, sau phần badge is_oke
                     Positioned(
                       top: 8,
                       right: 8,
@@ -347,75 +348,136 @@ class _LikePageState extends State<LikePage> {
               // PHẦN THÔNG TIN
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Tên sân
-                      Text(
-                        ten,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF2C3E50),
-                          height: 1.3,
+                      Container(
+                        constraints: BoxConstraints(maxHeight: 40), // THÊM DÒNG NÀY
+                        child: Text(
+                          ten,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF2C3E50),
+                            height: 1.3,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
 
-                      // Địa chỉ
+
+
                       if (diaChi.isNotEmpty)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(Icons.location_on, size: 14, color: Color(0xFF7F8C8D)),
-                            SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                diaChi,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFF7F8C8D),
-                                  height: 1.4,
+                        Container(
+                          constraints: BoxConstraints(maxHeight: 34), // THÊM DÒNG NÀY
+                          child:
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(Icons.location_on, size: 14, color: Color(0xFF7F8C8D)),
+                              SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  diaChi,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Color(0xFF7F8C8D),
+                                    height: 1.4,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
 
-                      // Thông tin liên hệ và giờ làm việc
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          if (sdt.isNotEmpty)
-                            Row(
+                          // Thông tin liên hệ
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.phone, size: 12, color: Color(0xFF7F8C8D)),
-                                SizedBox(width: 4),
-                                Text(
-                                  sdt,
-                                  style: TextStyle(fontSize: 11, color: Color(0xFF7F8C8D)),
-                                ),
-                              ],
-                            ),
+                                if (sdt.isNotEmpty)
+                                  Row(
+                                    children: [
+                                      Icon(Icons.phone, size: 12, color: Color(0xFF7F8C8D)),
+                                      SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          sdt,
+                                          style: TextStyle(fontSize: 11, color: Color(0xFF7F8C8D)),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
 
-                          if (gioMo.isNotEmpty || gioDong.isNotEmpty) ...[
-                            SizedBox(height: 2),
-                            Row(
+                                if (gioMo.isNotEmpty || gioDong.isNotEmpty) ...[
+                                  SizedBox(height: 2),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.access_time, size: 12, color: Color(0xFF7F8C8D)),
+                                      SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          '$gioMo - $gioDong',
+                                          style: TextStyle(fontSize: 11, color: Color(0xFF7F8C8D)),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+
+                          // NÚT ĐẶT SÂN
+                          SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => TrangThaiSan(
+                                    coSoId: id,
+                                    coSoData: data,
+                                  ),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFFC44536),
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              elevation: 2,
+                              minimumSize: Size(0, 0),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.access_time, size: 12, color: Color(0xFF7F8C8D)),
+                                Icon(Icons.sports_tennis, size: 14, color: Colors.white),
                                 SizedBox(width: 4),
                                 Text(
-                                  '$gioMo - $gioDong',
-                                  style: TextStyle(fontSize: 11, color: Color(0xFF7F8C8D)),
+                                  'Đặt sân',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ],
                             ),
-                          ],
+                          ),
                         ],
                       ),
                     ],

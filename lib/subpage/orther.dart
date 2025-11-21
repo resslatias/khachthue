@@ -1,309 +1,169 @@
 import 'package:flutter/material.dart';
-import 'package:khachthue/subpage/sub_in_orther/doc.dart';
-import 'package:khachthue/subpage/sub_in_orther/giaidau.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:khachthue/subpage/sub_in_orther/together.dart';
 
-
-/// ORTHER PAGE — Trang khám phá (không yêu cầu đăng nhập)
+/// ORTHER PAGE – Trang khám phá
 class OrtherPage extends StatelessWidget {
   const OrtherPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.fromLTRB(3, 8, 16, 16),
-          child: Row(
-            children: [
-              Icon(Icons.explore, color: Color(0xFFC44536), size: 24),
-              SizedBox(width: 8),
-              Text(
-                'Khám phá',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF2C3E50),
+    return Scaffold(
+      backgroundColor: Color(0xFFECF0F1),
+      body: Column(
+        children: [
+          // Header - GIỐNG VỚI CÁC TRANG TRƯỚC
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
                 ),
-              ),
-            ],
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.explore, color: Color(0xFFC44536), size: 24),
+                SizedBox(width: 12),
+                Text(
+                  'Khám phá',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2C3E50),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
 
-        // SECTION 1: KINH NGHIỆM CHƠI CẦU LÔNG
-        _SectionHeader(
-          icon: Icons.lightbulb_outline,
-          title: 'Kinh nghiệm chơi cầu lông',
-        ),
-        const SizedBox(height: 12),
-        _MenuCard(
-          items: [
-            _MenuItem(
-              icon: Icons.article,
-              title: 'Kỹ thuật cơ bản',
-              subtitle: 'Hướng dẫn cách cầm vợt, di chuyển cơ bản',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ExperienceListPage(
-                    category: 'basic',
-                    title: 'Kỹ thuật cơ bản',
+          // Content
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: 8),
+                  Text(
+                    'Tính năng',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF2C3E50),
+                    ),
                   ),
-                ),
-              ),
-            ),
-            _MenuDivider(),
-            _MenuItem(
-              icon: Icons.fitness_center,
-              title: 'Chiến thuật thi đấu',
-              subtitle: 'Mẹo và chiến thuật để thắng trận',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ExperienceListPage(
-                    category: 'tactics',
-                    title: 'Chiến thuật thi đấu',
+                  SizedBox(height: 16),
+
+                  // Tìm người chơi cùng
+                  _FeatureCard(
+                    icon: Icons.people_alt,
+                    title: 'Tìm người chơi cùng',
+                    subtitle: 'Kết nối với cộng đồng cầu lông',
+                    color: Color(0xFF3498DB),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TogetherPage(),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
-            _MenuDivider(),
-            _MenuItem(
-              icon: Icons.healing,
-              title: 'Phòng tránh chấn thương',
-              subtitle: 'Cách khởi động và bảo vệ cơ thể',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ExperienceListPage(
-                    category: 'health',
-                    title: 'Phòng tránh chấn thương',
+                  SizedBox(height: 12),
+
+                  // Giải đấu tháng
+                  _FeatureCard(
+                    icon: Icons.emoji_events,
+                    title: 'Giải đấu tháng',
+                    subtitle: 'Thông tin và lịch thi đấu',
+                    color: Color(0xFFF39C12),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => GoogleDocViewer(
+                          url: 'https://docs.google.com/document/d/1NHi2-JlkTOd25YP_eaUuwJH1CQEYCN9NncmyoiZ9TrU/edit?tab=t.0',
+                          title: 'Giải đấu tháng',
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ),
-            _MenuDivider(),
-            _MenuItem(
-              icon: Icons.shopping_bag,
-              title: 'Chọn mua trang thiết bị',
-              subtitle: 'Hướng dẫn chọn vợt, giày và phụ kiện',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ExperienceListPage(
-                    category: 'equipment',
-                    title: 'Chọn mua trang thiết bị',
+                  SizedBox(height: 12),
+
+                  // Kinh nghiệm chơi cầu lông
+                  _FeatureCard(
+                    icon: Icons.sports_tennis,
+                    title: 'Kinh nghiệm chơi cầu lông',
+                    subtitle: 'Kỹ thuật và chiến thuật thi đấu',
+                    color: Color(0xFFC44536),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => GoogleDocViewer(
+                          url: 'https://docs.google.com/document/d/1yhI66hGoYweF7LLdVtM2QOJt8iHUEfy8/edit',
+                          title: 'Kinh nghiệm chơi cầu lông',
+                        ),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        // SECTION 2: GIẢI ĐẤU
-        _SectionHeader(
-          icon: Icons.emoji_events_outlined,
-          title: 'Giải đấu',
-        ),
-        const SizedBox(height: 12),
-        _MenuCard(
-          items: [
-            _MenuItem(
-              icon: Icons.calendar_today,
-              title: 'Giải đấu tháng 12',
-              subtitle: 'Thông tin và lịch thi đấu tháng 12/2025',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TournamentDetailPage(
-                    month: 12,
-                    year: 2025,
-                  ),
-                ),
-              ),
-            ),
-            _MenuDivider(),
-            _MenuItem(
-              icon: Icons.history,
-              title: 'Giải đấu đã tổ chức',
-              subtitle: 'Xem lại các giải đấu trước đây',
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TournamentHistoryPage(),
-                ),
-              ),
-            ),
-            _MenuDivider(),
-            _MenuItem(
-              icon: Icons.app_registration,
-              title: 'Đăng ký thi đấu',
-              subtitle: 'Đăng ký tham gia giải đấu sắp tới',
-              onTap: () => _showComingSoon(context),
-            ),
-            _MenuDivider(),
-            _MenuItem(
-              icon: Icons.star,
-              title: 'Bảng xếp hạng',
-              subtitle: 'Xem thứ hạng của các tuyển thủ',
-              onTap: () => _showComingSoon(context),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        // SECTION 3: CỘNG ĐỒNG
-        _SectionHeader(
-          icon: Icons.groups_outlined,
-          title: 'Cộng đồng',
-        ),
-        const SizedBox(height: 12),
-        _MenuCard(
-          items: [
-            _MenuItem(
-              icon: Icons.forum,
-              title: 'Diễn đàn thảo luận',
-              subtitle: 'Trao đổi kinh nghiệm với cộng đồng',
-              onTap: () => _showComingSoon(context),
-            ),
-            _MenuDivider(),
-            _MenuItem(
-              icon: Icons.people,
-              title: 'Tìm bạn đánh cầu',
-              subtitle: 'Kết nối với các golfer khác',
-              onTap: () => _showComingSoon(context),
-            ),
-            _MenuDivider(),
-            _MenuItem(
-              icon: Icons.share,
-              title: 'Chia sẻ khoảnh khắc',
-              subtitle: 'Đăng ảnh và video của bạn',
-              onTap: () => _showComingSoon(context),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-      ],
-    );
-  }
-
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.info, color: Colors.white, size: 20),
-            SizedBox(width: 12),
-            Text('Tính năng đang phát triển'),
-          ],
-        ),
-        backgroundColor: Color(0xFFF39C12),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-      ),
-    );
-  }
-}
-
-// =============================================
-// Các component UI tái sử dụng
-// =============================================
-class _SectionHeader extends StatelessWidget {
-  final IconData icon;
-  final String title;
-
-  const _SectionHeader({
-    required this.icon,
-    required this.title,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          padding: EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: Color(0xFFC44536).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: Color(0xFFC44536), size: 20),
-        ),
-        SizedBox(width: 12),
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF2C3E50),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MenuCard extends StatelessWidget {
-  final List<Widget> items;
-
-  const _MenuCard({required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: Offset(0, 2),
           ),
         ],
       ),
-      child: Column(children: items),
     );
   }
 }
 
-class _MenuItem extends StatelessWidget {
+// Feature Card Widget - ĐÃ TỐI ƯU
+class _FeatureCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final Color color;
   final VoidCallback onTap;
 
-  const _MenuItem({
+  const _FeatureCard({
     required this.icon,
     required this.title,
     required this.subtitle,
+    required this.color,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.transparent,
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      elevation: 1,
+      shadowColor: Colors.black.withOpacity(0.08),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Container(
+          padding: EdgeInsets.all(16),
           child: Row(
             children: [
+              // Icon container - NHỎ GỌN HƠN
               Container(
-                padding: EdgeInsets.all(10),
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: Color(0xFFC44536).withOpacity(0.1),
+                  color: color.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: Color(0xFFC44536), size: 22),
+                child: Icon(
+                  icon,
+                  color: color,
+                  size: 22,
+                ),
               ),
-              SizedBox(width: 16),
+              SizedBox(width: 12),
+              // Text content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -311,8 +171,8 @@ class _MenuItem extends StatelessWidget {
                     Text(
                       title,
                       style: TextStyle(
-                        fontWeight: FontWeight.w600,
                         fontSize: 15,
+                        fontWeight: FontWeight.w600,
                         color: Color(0xFF2C3E50),
                       ),
                     ),
@@ -327,7 +187,12 @@ class _MenuItem extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: Color(0xFFBDC3C7), size: 20),
+              // Arrow icon - NHỎ HƠN
+              Icon(
+                Icons.chevron_right,
+                color: Color(0xFFBDC3C7),
+                size: 20,
+              ),
             ],
           ),
         ),
@@ -336,14 +201,77 @@ class _MenuItem extends StatelessWidget {
   }
 }
 
-class _MenuDivider extends StatelessWidget {
+// Google Doc Viewer Page - GIỮ NGUYÊN HOẶC CÓ THỂ TỐI ƯU NẾU CẦN
+class GoogleDocViewer extends StatefulWidget {
+  final String url;
+  final String title;
+
+  const GoogleDocViewer({
+    super.key,
+    required this.url,
+    required this.title,
+  });
+
+  @override
+  State<GoogleDocViewer> createState() => _GoogleDocViewerState();
+}
+
+class _GoogleDocViewerState extends State<GoogleDocViewer> {
+  late final WebViewController controller;
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+
+    controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) {
+            setState(() {
+              isLoading = true;
+            });
+          },
+          onPageFinished: (String url) {
+            setState(() {
+              isLoading = false;
+            });
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(widget.url));
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Divider(
-        height: 1,
-        color: Color(0xFFECF0F1),
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Color(0xFF2C3E50),
+        elevation: 1,
+        title: Text(
+          widget.title,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 16,
+          ),
+        ),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Color(0xFF2C3E50)),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: controller),
+          if (isLoading)
+            Center(
+              child: CircularProgressIndicator(
+                color: Color(0xFFC44536),
+              ),
+            ),
+        ],
       ),
     );
   }
