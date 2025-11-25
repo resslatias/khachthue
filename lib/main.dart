@@ -53,6 +53,8 @@ Future<void> main() async {
   // Init Firebase trong background
   await Firebase.initializeApp();
 
+  //createSamplePosts();
+
   // Cleanup không blocking --> gần dòng 64
   _cleanupExpiredCourtsOnStartup().catchError((e) {
     debugPrint("Hàm debug này ở main.dart . Lỗi dọn dẹp : $e");

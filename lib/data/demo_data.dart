@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 
 
@@ -507,3 +508,218 @@ await tao_du_lieu_demo_day_du(
 */
 
 
+Future<void> createSamplePosts() async {
+  final firestore = FirebaseFirestore.instance;
+
+  final sampleUsers = [
+    {
+      "userId": "5LikW5XUdkXqiRCQvibASAW93tb2",
+      "name": "Bhj",
+      "phone": "13688",
+      "email": "ghh@gh.com"
+    },
+    {
+      "userId": "7IfqjFkZv9SWldzobO1zzvXt1sr2",
+      "name": "Muaheha",
+      "phone": "",
+      "email": "muahehe@muahehe.com"
+    },
+    {
+      "userId": "9xJbWkt8eZdjIFXE6EKQ5h9f7yg1",
+      "name": "Người Việt Nam",
+      "phone": "113",
+      "email": "resslatias@gmail.com"
+    },
+    {
+      "userId": "CuTrf756Q9YhfzXtb9ZkTjjj9D72",
+      "name": "Long Thanh",
+      "phone": "0312432132",
+      "email": "Longthanh@gmail.com"
+    },
+    {
+      "userId": "TXcDbv7gmdZSLY1ScTjDW9xsdw72",
+      "name": "Long Thanh",
+      "phone": "0334565432",
+      "email": "long1@gmail.con"
+    },
+  ];
+
+  final locations = [
+    {"ward": "Dịch Vọng", "district": "Cầu Giấy", "province": "Hà Nội"},
+    {"ward": "Mai Dịch", "district": "Cầu Giấy", "province": "Hà Nội"},
+    {"ward": "Nghĩa Tân", "district": "Cầu Giấy", "province": "Hà Nội"},
+    {"ward": "Quan Hoa", "district": "Cầu Giấy", "province": "Hà Nội"},
+    {"ward": "Trung Hòa", "district": "Cầu Giấy", "province": "Hà Nội"},
+    {"ward": "Kim Mã", "district": "Ba Đình", "province": "Hà Nội"},
+    {"ward": "Ngọc Hà", "district": "Ba Đình", "province": "Hà Nội"},
+    {"ward": "Đội Cấn", "district": "Ba Đình", "province": "Hà Nội"},
+    {"ward": "Thành Công", "district": "Ba Đình", "province": "Hà Nội"},
+    {"ward": "Giảng Võ", "district": "Ba Đình", "province": "Hà Nội"},
+  ];
+
+  final courts = [
+    "Sân cầu lông Cầu Giấy",
+    "Sân cầu lông Mỹ Đình",
+    "Sân cầu lông Trần Khát Chân",
+    "Sân cầu lông Hà Đông",
+    "Sân cầu lông Tây Hồ",
+    "Sân cầu lông Thanh Xuân",
+    "Sân cầu lông Long Biên",
+    "Sân cầu lông Hoàng Mai",
+    "Sân cầu lông Đống Đa",
+    "Sân cầu lông Hai Bà Trưng",
+  ];
+
+  final descriptions = [
+    "Tìm người chơi trình độ trung bình, vui vẻ hòa đồng",
+    "Chơi giải trí, không quá chuyên nghiệp",
+    "Tìm người chơi có kinh nghiệm, trao đổi kỹ thuật",
+    "Buổi chơi thư giãn sau giờ làm",
+    "Tập luyện chuẩn bị cho giải đấu công ty",
+    "Chơi cầu lông rèn luyện sức khỏe",
+    "Tìm partner đánh đôi ăn ý",
+    "Buổi chơi cho người mới bắt đầu",
+    "Chơi cầu lông cuối tuần thư giãn",
+    "Tìm người chơi có kỹ thuật tốt để nâng cao trình độ"
+  ];
+
+  final sessions = ["sang", "chieu", "toi"];
+  final now = DateTime.now();
+  final dateFormat = DateFormat('yyyy-MM-dd');
+
+  print("Bắt đầu tạo dữ liệu thử nghiệm...");
+
+  try {
+    for (int i = 0; i < 10; i++) {
+      // Tạo ngày ngẫu nhiên trong 7 ngày tới
+      final randomDate = now.add(Duration(days: i % 7));
+      final dateStr = dateFormat.format(randomDate);
+
+      // Chọn ngẫu nhiên các thông tin
+      final creator = sampleUsers[i % sampleUsers.length];
+      final location = locations[i];
+      final court = courts[i];
+      final session = sessions[i % sessions.length];
+      final maxParticipants = [2, 4, 6][i % 3];
+
+      // Tạo ID duy nhất cho bài đăng trong buổi
+      final postId = '${now.millisecondsSinceEpoch + i}_$i';
+
+      // Tạo danh sách người tham gia ngẫu nhiên (1-3 người)
+      final participants = <Map<String, dynamic>>[];
+      final numberOfParticipants = (i % 3) + 1;
+
+      for (int j = 0; j < numberOfParticipants; j++) {
+        final participantUser = sampleUsers[(i + j + 1) % sampleUsers.length];
+        participants.add({
+          'userId': participantUser['userId'],
+          'name': participantUser['name'],
+          'phone': participantUser['phone'],
+          'email': participantUser['email'],
+          'joinedAt': Timestamp.now(),
+        });
+      }
+
+      // Dữ liệu bài đăng
+      final postData = <String, dynamic>{
+        'postId': postId,
+        'ngay_choi': dateStr,
+        'buoi_choi': session,
+        'nguoi_tao': {
+          'userId': creator['userId'],
+          'name': creator['name'],
+          'phone': creator['phone'],
+          'email': creator['email'],
+        },
+        'mo_ta': descriptions[i],
+        'dia_chi': {
+          'Phuong': location['ward'],
+          'huyen': location['district'],
+          'tinh': location['province'],
+        },
+        'id_co_so': court,
+        'so_nguoi': maxParticipants,
+        'so_nguoi_hien_tai': participants.length,
+        'nguoi_tham_gia': participants,
+        'createdAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      };
+
+      // Cấu trúc: posts/{date}/{session}/{postId}
+      await firestore
+          .collection('posts')
+          .doc(dateStr)
+          .collection(session)
+          .doc(postId)
+          .set(postData);
+
+      print("✅ Đã tạo bài đăng $i: posts/$dateStr/$session/$postId");
+      print("   👤 Người tạo: ${creator['name']}");
+      print("   👥 Số người tham gia: ${participants.length}/$maxParticipants");
+      print("   📍 Địa điểm: ${location['ward']}, ${location['district']}");
+      print("");
+
+      // Thêm delay nhỏ để tránh rate limit
+      await Future.delayed(Duration(milliseconds: 300));
+    }
+
+    print("🎉 Đã tạo thành công 10 bài đăng thử nghiệm!");
+    print("📁 Cấu trúc: posts/{date}/{session}/{postId}");
+    print("📊 Mỗi bài đăng đã bao gồm cả danh sách người tham gia");
+
+  } catch (e, stackTrace) {
+    print("❌ Lỗi khi tạo dữ liệu: $e");
+    print("Stack trace: $stackTrace");
+    rethrow;
+  }
+}
+
+// Hàm query ví dụ để lấy dữ liệu theo cấu trúc mới
+Future<void> queryPostsByDateAndSession(String date, String session) async {
+  final firestore = FirebaseFirestore.instance;
+
+  try {
+    final snapshot = await firestore
+        .collection('posts')
+        .doc(date)
+        .collection(session)
+        .get();
+
+    print("Tìm thấy ${snapshot.docs.length} bài đăng cho $date - $session");
+
+    for (var doc in snapshot.docs) {
+      final data = doc.data();
+      print("- ${data['creator']['name']}: ${data['description']}");
+    }
+  } catch (e) {
+    print("Lỗi khi query: $e");
+  }
+}
+
+// Hàm lấy tất cả bài đăng của một ngày
+Future<void> queryAllPostsByDate(String date) async {
+  final firestore = FirebaseFirestore.instance;
+
+  try {
+    final sessions = ["sang", "chieu", "toi"];
+
+    for (var session in sessions) {
+      final snapshot = await firestore
+          .collection('posts')
+          .doc(date)
+          .collection(session)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        print("\n📅 $date - Buổi $session:");
+        for (var doc in snapshot.docs) {
+          final data = doc.data();
+          print("  👤 ${data['creator']['name']}: ${data['description']}");
+          print("  👥 ${data['currentParticipants']}/${data['maxParticipants']} người");
+        }
+      }
+    }
+  } catch (e) {
+    print("Lỗi khi query: $e");
+  }
+}
