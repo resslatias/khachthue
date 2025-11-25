@@ -76,25 +76,31 @@ class _RefundPageViewState extends State<_RefundPageView> {
 
       List<Map<String, dynamic>> allOrders = [];
 
+      debugPrint('📦 Số cơ sở: ${coSoSnapshot.docs.length}');
+
       // Duyệt qua tất cả các cơ sở
       for (var coSoDoc in coSoSnapshot.docs) {
         final coSoId = coSoDoc.id;
         final coSoData = coSoDoc.data();
 
-        // Lấy tất cả đơn hàng trong collection don_dat của mỗi cơ sở
+        debugPrint('🏢 Đang xử lý cơ sở: $coSoId');
+
+        // ✅ BỎ orderBy - chỉ lấy tất cả đơn hàng
         final donDatSnapshot = await _firestore
             .collection('cho_hoan_tien')
             .doc(userId)
             .collection('co_so')
             .doc(coSoId)
             .collection('don_dat')
-            .orderBy('ngay_yeu_cau_huy', descending: true)
-            .get();
+            .get(); // ← BỎ orderBy
+
+        debugPrint('  📋 Số đơn của cơ sở $coSoId: ${donDatSnapshot.docs.length}');
 
         // Thêm thông tin cơ sở vào mỗi đơn hàng
         for (var donDatDoc in donDatSnapshot.docs) {
           var donDatData = donDatDoc.data();
-          allOrders.add({
+
+          final orderData = {
             ...donDatData,
             'doc_id': donDatDoc.id,
             'co_so_id': coSoId,
@@ -102,18 +108,21 @@ class _RefundPageViewState extends State<_RefundPageView> {
             'ten_co_so': coSoData['ten_co_so'] ?? donDatData['ten_co_so'] ?? '',
             // Ưu tiên lấy địa chỉ từ đơn hàng, nếu không có thì lấy từ document co_so
             'dia_chi_co_so': donDatData['dia_chi_co_so'] ?? coSoData['dia_chi_co_so'] ?? '',
-          });
+          };
+
+          allOrders.add(orderData);
+          debugPrint('    ✅ Thêm đơn: ${donDatDoc.id}');
         }
       }
 
-      // Sắp xếp lại toàn bộ danh sách theo thời gian yêu cầu hủy
+      // ✅ Sắp xếp toàn bộ danh sách theo thời gian yêu cầu hủy (ở trong code, không dùng Firestore)
       allOrders.sort((a, b) {
         final Timestamp? aTime = a['ngay_yeu_cau_huy'];
         final Timestamp? bTime = b['ngay_yeu_cau_huy'];
         if (aTime == null && bTime == null) return 0;
         if (aTime == null) return 1;
         if (bTime == null) return -1;
-        return bTime.compareTo(aTime); // descending
+        return bTime.compareTo(aTime); // descending - mới nhất lên đầu
       });
 
       debugPrint('✅ Tổng: ${allOrders.length} đơn chờ hoàn tiền');
@@ -354,6 +363,7 @@ class _RefundOrderCard extends StatelessWidget {
     final tongTien = (order['tong_tien'] as num?)?.toInt() ?? 0;
     final soTienHoan = (tongTien * 0.8).toInt();
     final daHoanTien = order['da_hoan_tien'] as bool? ?? false;
+    final minhChung = order['minh_chung'] as String? ?? ''; // THÊM DÒNG NÀY
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -524,6 +534,72 @@ class _RefundOrderCard extends StatelessWidget {
                   ),
                 ),
 
+                // THÊM PHẦN HIỂN THỊ MINH CHỨNG
+                if (daHoanTien && minhChung.isNotEmpty) ...[
+                  SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () => _showImageFullScreen(context, minhChung),
+                    child: Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF27AE60).withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Color(0xFF27AE60).withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Image.network(
+                              minhChung,
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 50,
+                                height: 50,
+                                color: Colors.grey[300],
+                                child: Icon(Icons.broken_image, color: Colors.grey[600]),
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.verified, size: 16, color: Color(0xFF27AE60)),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Minh chứng hoàn tiền',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF27AE60),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Nhấn để xem chi tiết',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF7F8C8D),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.arrow_forward_ios, size: 14, color: Color(0xFF27AE60)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+
                 // Thông báo hỗ trợ
                 if (!daHoanTien) ...[
                   SizedBox(height: 12),
@@ -554,6 +630,95 @@ class _RefundOrderCard extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+// Thêm hàm hiển thị ảnh full screen
+  void _showImageFullScreen(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.9),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.all(20),
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.5,
+                maxScale: 3.0,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Container(
+                      padding: EdgeInsets.all(40),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.broken_image, size: 60, color: Colors.white),
+                          SizedBox(height: 16),
+                          Text(
+                            'Không thể tải ảnh',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        padding: EdgeInsets.all(40),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                                : null,
+                            color: Colors.white,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconButton(
+                icon: Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            Positioned(
+              bottom: 20,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Minh chứng hoàn tiền',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -625,6 +790,7 @@ class _RefundDetailBottomSheet extends StatelessWidget {
     final maDon = order['ma_don'] as String? ?? '';
     final tenNguoiDat = order['ten_nguoi_dat'] as String? ?? '';
     final sdt = order['sdt'] as String? ?? '';
+    final minhChung = order['minh_chung'] as String? ?? ''; // THÊM DÒNG NÀY
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.9,
@@ -725,6 +891,92 @@ class _RefundDetailBottomSheet extends StatelessWidget {
 
                   SizedBox(height: 24),
 
+                  // THÊM PHẦN MINH CHỨNG
+                  if (daHoanTien && minhChung.isNotEmpty) ...[
+                    Container(
+                      padding: EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF27AE60).withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Color(0xFF27AE60).withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.verified, size: 20, color: Color(0xFF27AE60)),
+                              SizedBox(width: 8),
+                              Text(
+                                'Minh chứng hoàn tiền',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Color(0xFF27AE60),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 16),
+                          GestureDetector(
+                            onTap: () => _showImageFullScreen(context, minhChung),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                minhChung,
+                                width: double.infinity,
+                                height: 200,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  width: double.infinity,
+                                  height: 200,
+                                  color: Colors.grey[300],
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.broken_image, size: 40, color: Colors.grey[600]),
+                                      SizedBox(height: 8),
+                                      Text('Không thể tải ảnh', style: TextStyle(color: Colors.grey[600])),
+                                    ],
+                                  ),
+                                ),
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Container(
+                                    width: double.infinity,
+                                    height: 200,
+                                    color: Colors.grey[200],
+                                    child: Center(
+                                      child: CircularProgressIndicator(
+                                        value: loadingProgress.expectedTotalBytes != null
+                                            ? loadingProgress.cumulativeBytesLoaded /
+                                            loadingProgress.expectedTotalBytes!
+                                            : null,
+                                        color: Color(0xFF27AE60),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 12),
+                          Center(
+                            child: Text(
+                              'Nhấn vào ảnh để xem rõ hơn',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF7F8C8D),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                  ],
+
                   // Thông tin đơn hàng
                   _buildSection(
                       'Thông tin đơn hàng',
@@ -811,6 +1063,95 @@ class _RefundDetailBottomSheet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+// Thêm hàm hiển thị ảnh full screen (giống như trong _RefundOrderCard)
+  void _showImageFullScreen(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.9),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.all(20),
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                panEnabled: true,
+                minScale: 0.5,
+                maxScale: 3.0,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Container(
+                      padding: EdgeInsets.all(40),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.broken_image, size: 60, color: Colors.white),
+                          SizedBox(height: 16),
+                          Text(
+                            'Không thể tải ảnh',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        padding: EdgeInsets.all(40),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                                : null,
+                            color: Colors.white,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconButton(
+                icon: Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            Positioned(
+              bottom: 20,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Minh chứng hoàn tiền',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

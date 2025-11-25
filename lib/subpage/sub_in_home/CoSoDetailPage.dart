@@ -271,38 +271,52 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
     }
 
     try {
-
-      // Kiểm tra xem user đã đặt sân tại cơ sở này chưa
-      final snapshot = await FirebaseFirestore.instance
+      // Kiểm tra số đơn đã đặt tại cơ sở này
+      final donDatSnapshot = await FirebaseFirestore.instance
           .collection('lich_su_khach')
           .doc(user.uid)
           .collection('don_dat')
           .where('co_so_id', isEqualTo: widget.coSoId)
           .where('trang_thai', isEqualTo: 'da_thanh_toan')
-          .limit(1)
           .get();
 
-
-      if (snapshot.docs.isEmpty) {
-        // Chưa từng đặt sân tại cơ sở này
+      if (donDatSnapshot.docs.isEmpty) {
         _showMessage('Bạn cần đặt sân tại cơ sở này trước khi đánh giá');
         return;
       }
 
-      //  Đã đặt sân -> Hiển thị dialog đánh giá
+      final soDonDaDat = donDatSnapshot.docs.length;
+
+      // Kiểm tra số đánh giá đã viết
+      final danhGiaSnapshot = await FirebaseFirestore.instance
+          .collection('danh_gia')
+          .doc(widget.coSoId)
+          .collection('reviews')
+          .where('ma_nguoi_danh_gia', isEqualTo: user.uid)
+          .get();
+
+      final soDanhGia = danhGiaSnapshot.docs.length;
+
+      // Kiểm tra điều kiện: số đánh giá phải <= số đơn đã đặt
+      if (soDanhGia >= soDonDaDat) {
+        _showMessage('Bạn đã đánh giá đủ số lần (${soDanhGia}/${soDonDaDat} đơn)');
+        return;
+      }
+
+      // Đủ điều kiện -> Hiển thị dialog đánh giá
       if (mounted) {
         showDialog(
           context: context,
           builder: (ctx) => ReviewDialog(
             coSoId: widget.coSoId,
-            coSoName: widget.coSoData['ten'] as String? ?? 'Cơ sở', // SỬA LẠI CHO ĐÚNG
+            coSoName: widget.coSoData['ten'] as String? ?? 'Cơ sở',
             userId: user.uid,
+            soDonDaDat: soDonDaDat,
+            soDanhGiaDaCo: soDanhGia,
           ),
         );
       }
     } catch (e) {
-      // Đóng loading dialog nếu có lỗi - ĐẢM BẢO LUÔN ĐÓNG KHI CÓ LỖI
-      if (mounted) Navigator.of(context).pop();
       _showMessage('Lỗi kiểm tra lịch sử: $e');
     }
   }
@@ -726,24 +740,38 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             ),
             color: Colors.white,
             child: Row(
+             // crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Nút back
                 IconButton(
                   icon: Icon(Icons.arrow_back, color: Color(0xFF2C3E50)),
                   onPressed: () => Navigator.pop(context),
                 ),
+                SizedBox(width: 8),
                 // Tiêu đề
                 Expanded(
-                  child: Text(
-                    ten,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2C3E50),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          ten,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2C3E50),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ],
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                SizedBox(width: 8),
                 // Nút yêu thích
                 Container(
                   width: 40,
@@ -885,17 +913,19 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
+
           Expanded(
             child: ElevatedButton.icon(
               onPressed: _showPriceBottomSheet,
               icon: Icon(Icons.attach_money, size: 18),
               label: Text('Bảng giá', style: TextStyle(fontSize: 13)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFFC44536),
-                foregroundColor: Colors.white,
+                backgroundColor: Colors.white,
+                foregroundColor: Color(0xFF2C3E50),
                 padding: EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(color: Color(0xFFBDC3C7)),
                 ),
               ),
             ),
@@ -1272,15 +1302,20 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
 
   Widget _buildZaloGroupsSection() {
     final nhomSeVe = widget.coSoData['nhom_xe_ve'];
-    List<String> zaloGroups = [];
+    List<Map<String, dynamic>> zaloGroups = [];
 
     if (nhomSeVe is List) {
       zaloGroups = nhomSeVe
-          .where((item) => item is String && item.isNotEmpty)
-          .map((item) => item as String)
+          .where((item) => item is Map<String, dynamic>)
+          .map((item) {
+        final map = item as Map<String, dynamic>;
+        return {
+          'link': map['link'] as String? ?? '',
+          'nen_tang': map['nen_tang'] as String? ?? 'Zalo',
+        };
+      })
+          .where((item) => (item['link'] as String).isNotEmpty)
           .toList();
-    } else if (nhomSeVe is String && nhomSeVe.isNotEmpty) {
-      zaloGroups = [nhomSeVe];
     }
 
     if (zaloGroups.isEmpty) return SizedBox.shrink();
@@ -1317,9 +1352,12 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                   runSpacing: 8,
                   children: zaloGroups.asMap().entries.map((entry) {
                     final index = entry.key;
-                    final url = entry.value;
+                    final groupData = entry.value;
+                    final link = groupData['link'] as String;
+                    final platform = groupData['nen_tang'] as String;
+
                     return InkWell(
-                      onTap: () => _openZaloGroup(url),
+                      onTap: () => _openZaloGroup(link),
                       child: Container(
                         padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                         decoration: BoxDecoration(
@@ -1333,7 +1371,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                             Icon(Icons.chat, size: 16, color: Color(0xFF0068FF)),
                             SizedBox(width: 6),
                             Text(
-                              'Nhóm ${index + 1}',
+                              '$platform ${index + 1}',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: Color(0xFF0068FF),
@@ -1710,12 +1748,16 @@ class ReviewDialog extends StatefulWidget {
   final String coSoId;
   final String coSoName;
   final String userId;
+  final int soDonDaDat;
+  final int soDanhGiaDaCo;
 
   const ReviewDialog({
     super.key,
     required this.coSoId,
     required this.coSoName,
     required this.userId,
+    required this.soDonDaDat,
+    required this.soDanhGiaDaCo,
   });
 
   @override
@@ -1734,9 +1776,7 @@ class _ReviewDialogState extends State<ReviewDialog> {
   }
 
   Future<void> _submitReview() async {
-    if (_controller.text
-        .trim()
-        .isEmpty) {
+    if (_controller.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Vui lòng nhập nội dung đánh giá'),
@@ -1807,6 +1847,8 @@ class _ReviewDialogState extends State<ReviewDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final soLuotConLai = widget.soDonDaDat - widget.soDanhGiaDaCo;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.symmetric(horizontal: 20),
@@ -1825,7 +1867,7 @@ class _ReviewDialogState extends State<ReviewDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // HEADER VỚI MÀU NỀN KHÁC
+            // HEADER
             Container(
               padding: EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -1837,27 +1879,41 @@ class _ReviewDialogState extends State<ReviewDialog> {
               ),
               child: Row(
                 children: [
-                  //Icon(Icons.star, color: Colors.white, size: 24),
                   SizedBox(width: 8),
-                  Text(
-                    'Đánh giá cơ sở',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Đánh giá cơ sở',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Còn $soLuotConLai lượt đánh giá (${widget.soDanhGiaDaCo}/${widget.soDonDaDat})',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
 
-            // PHẦN THÂN VỚI NỀN TRẮNG
+            // PHẦN THÂN
             Padding(
               padding: EdgeInsets.all(20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // HÀNG "CHỌN SỐ SAO" VÀ CÁC NGÔI SAO CÙNG MỘT HÀNG
+                  // HÀNG "CHỌN SỐ SAO"
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -1870,7 +1926,6 @@ class _ReviewDialogState extends State<ReviewDialog> {
                         ),
                       ),
                       SizedBox(width: 12),
-                      // CÁC NGÔI SAO
                       Row(
                         children: List.generate(5, (index) {
                           return IconButton(
