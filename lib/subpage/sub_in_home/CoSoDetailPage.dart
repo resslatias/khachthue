@@ -38,68 +38,26 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
       return;
     }
 
-    // Kiểm tra bảng giá
-    final giaSan = widget.coSoData['gia_san'] as List<dynamic>?;
+    // Lấy bảng giá 24 giờ
     final bangGia = widget.coSoData['bang_gia'] as List<dynamic>?;
 
-    // Nếu cả 2 đều null/rỗng
-    if ((giaSan == null || giaSan.isEmpty) && (bangGia == null || bangGia.isEmpty)) {
+    // Kiểm tra bảng giá
+    if (bangGia == null || bangGia.isEmpty) {
       _showErrorDialog('Thiếu thông tin giá', 'Cơ sở chưa cập nhật bảng giá.');
       return;
     }
 
-    // Nếu có gia_san → tạo bang_gia từ gia_san
-    if (giaSan != null && giaSan.isNotEmpty) {
-      _processedBangGia = _createBangGiaFromGiaSan(giaSan);
-    }
-    // Nếu chỉ có bang_gia → validate bang_gia
-    else if (bangGia != null && bangGia.isNotEmpty) {
-      if (!_validateBangGia(bangGia)) {
-        _showErrorDialog('Bảng giá không hợp lệ', 'Bảng giá phải có đủ 24 giá trị hợp lệ (> 0).');
-        return;
-      }
-      _processedBangGia = bangGia.map((e) => (e is int ? e : (e as num).toInt())).toList();
+    // Validate bảng giá
+    if (!_validateBangGia(bangGia)) {
+      _showErrorDialog('Bảng giá không hợp lệ', 'Bảng giá phải có 24 giá trị.');
+      return;
     }
 
-    // Nếu validate thành công → load favorite status
+    // Chuyển đổi sang List<int>
+    _processedBangGia = bangGia.map((e) => (e is int ? e : (e as num).toInt())).toList();
+
+    // Load favorite status
     _checkFavoriteStatus();
-  }
-
-  List<int> _createBangGiaFromGiaSan(List<dynamic> giaSan) {
-    List<int> bangGia = List.filled(24, 10000); // Mặc định 10000đ
-
-    for (var item in giaSan) {
-      if (item is! Map<String, dynamic>) continue;
-
-      final gio = item['gio'] as String?;
-      final gia = item['gia'];
-
-      if (gio == null || gio.isEmpty || gia == null) continue;
-
-      // Parse giờ từ "19:00 - 20:00" → lấy 19
-      final gioBatDau = _parseGioBatDau(gio);
-      if (gioBatDau == null || gioBatDau < 0 || gioBatDau >= 24) continue;
-
-      final giaInt = gia is int ? gia : (gia as num).toInt();
-      bangGia[gioBatDau] = giaInt;
-    }
-
-    return bangGia;
-  }
-
-  int? _parseGioBatDau(String gioStr) {
-    try {
-      // "19:00 - 20:00" → "19:00" → 19
-      final parts = gioStr.split('-');
-      if (parts.isEmpty) return null;
-
-      final gioBatDau = parts[0].trim().split(':');
-      if (gioBatDau.isEmpty) return null;
-
-      return int.tryParse(gioBatDau[0]);
-    } catch (e) {
-      return null;
-    }
   }
 
   bool _validateBangGia(List<dynamic> bangGia) {
@@ -107,9 +65,8 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
 
     for (var gia in bangGia) {
       if (gia == null) return false;
-
       final giaInt = gia is int ? gia : (gia is num ? (gia as num).toInt() : null);
-      if (giaInt == null || giaInt < 1) return false;
+      if (giaInt == null) return false;
     }
 
     return true;
@@ -1441,19 +1398,6 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
 
   Widget _buildPriceTables() {
     final giaSan = widget.coSoData['gia_san'] as List<dynamic>?;
-
-    // Nếu có gia_san, hiển thị chi tiết
-    if (giaSan != null && giaSan.isNotEmpty) {
-      return Column(
-        children: [
-          //_buildGiaSanTable(giaSan),
-          //SizedBox(height: 16),
-          _buildBangGiaTable(_processedBangGia),
-        ],
-      );
-    }
-
-    // Nếu không có gia_san, chỉ hiển thị bang_gia
     return _buildBangGiaTable(_processedBangGia);
   }
 
