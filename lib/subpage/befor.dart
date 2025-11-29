@@ -807,6 +807,7 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
   }
 
   /// 🔥 XỬ LÝ HỦY ĐƠN - CORE LOGIC
+  /// 🔥 XỬ LÝ HỦY ĐƠN - CORE LOGIC (CẬP NHẬT)
   Future<void> _processCancelOrder() async {
     final maDon = widget.order['ma_don'] as String? ?? '';
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -859,17 +860,15 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
       });
     }
 
-    // 4️⃣ Tạo bản ghi cho_hoan_tien
-
+    // 4️⃣ Tạo bản ghi cho_hoan_tien (cho người dùng truy vấn)
     await firestore
         .collection('cho_hoan_tien')
         .doc(userId)
         .set({
       'created_at': FieldValue.serverTimestamp(),
       'user_id': userId,
-    }, SetOptions(merge: true)); // merge: true để không ghi đè nếu đã tồn tại
+    }, SetOptions(merge: true));
 
-    // Tạo document cho co_so với thông tin cơ bản
     await firestore
         .collection('cho_hoan_tien')
         .doc(userId)
@@ -877,7 +876,7 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
         .doc(coSoId)
         .set({
       'co_so_id': coSoId,
-      'ten_co_so': widget.order['ten_co_so'] ?? '', // nếu có
+      'ten_co_so': widget.order['ten_co_so'] ?? '',
       'created_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
@@ -894,10 +893,49 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
       'da_hoan_tien': false,
       'time_hoan_tien': null,
       'phuong_thuc': '',
+      'minh_chung': '',
       'ngay_yeu_cau_huy': FieldValue.serverTimestamp(),
     });
 
-    // 5️⃣ Tạo thông báo
+    // 5️⃣ Tạo bản ghi cho_hoan_tien_2 (cho chủ sân truy vấn) - MỚI
+    await firestore
+        .collection('cho_hoan_tien_2')
+        .doc(coSoId)
+        .set({
+      'created_at': FieldValue.serverTimestamp(),
+      'co_so_id': coSoId,
+    }, SetOptions(merge: true));
+
+    await firestore
+        .collection('cho_hoan_tien_2')
+        .doc(coSoId)
+        .collection('khach_hang')
+        .doc(userId)
+        .set({
+      'user_id': userId,
+      'ten_nguoi_dat': widget.order['ten_nguoi_dat'] ?? '',
+      'sdt': widget.order['sdt'] ?? '',
+      'created_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    await firestore
+        .collection('cho_hoan_tien_2')
+        .doc(coSoId)
+        .collection('khach_hang')
+        .doc(userId)
+        .collection('don_dat')
+        .doc(maDon)
+        .set({
+      ...widget.order,
+      'trang_thai': 'da_huy',
+      'da_hoan_tien': false,
+      'time_hoan_tien': null,
+      'phuong_thuc': '',
+      'minh_chung': '',
+      'ngay_yeu_cau_huy': FieldValue.serverTimestamp(),
+    });
+
+    // 6️⃣ Tạo thông báo cho người dùng
     await firestore
         .collection('thong_bao')
         .doc(userId)
@@ -908,6 +946,20 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
       'da_xem_chua': false,
       'Urlweb': null,
       'Urlimage': null,
+      'ngay_tao': FieldValue.serverTimestamp(),
+    });
+
+    // 7️⃣ Tạo thông báo cho chủ sân - MỚI
+    await firestore
+        .collection('thong_bao_chu_san')
+        .doc(coSoId)
+        .collection('notifications')
+        .add({
+      'tieu_de': 'Có đơn hủy cần hoàn tiền',
+      'noi_dung': 'Khách hàng ${widget.order['ten_nguoi_dat'] ?? ''} đã hủy đơn #${maDon.substring(0, 8).toUpperCase()}. Vui lòng hoàn 80% tiền cho khách.',
+      'da_xem_chua': false,
+      'ma_don': maDon,
+      'user_id': userId,
       'ngay_tao': FieldValue.serverTimestamp(),
     });
 

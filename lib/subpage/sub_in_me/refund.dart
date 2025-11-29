@@ -309,14 +309,160 @@ class _RefundPageViewState extends State<_RefundPageView> {
       color: Color(0xFFC44536),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: refundOrders.length,
+        itemCount: refundOrders.length + 1, // +1 cho warning
         itemBuilder: (context, index) {
+          // Hiển thị warning ở cuối
+          if (index == refundOrders.length) {
+            return _buildWarningSection();
+          }
+
           final order = refundOrders[index];
           return _RefundOrderCard(
             order: order,
             onTap: () => _showRefundDetail(order),
           );
         },
+      ),
+    );
+  }
+
+// Thêm widget warning mới
+  Widget _buildWarningSection() {
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Color(0xFFE74C3C),
+            Color(0xFFC0392B),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0xFFE74C3C).withOpacity(0.3),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.white,
+            size: 40,
+          ),
+          SizedBox(height: 12),
+          Text(
+            'CẢNH BÁO QUAN TRỌNG',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Liên hệ ngay Chăm Sóc Khách Hàng nếu:',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 12),
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('• ', style: TextStyle(color: Colors.white, fontSize: 14)),
+                    Expanded(
+                      child: Text(
+                        'Chủ sân đã xác nhận hoàn tiền nhưng bạn chưa nhận được',
+                        style: TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 6),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('• ', style: TextStyle(color: Colors.white, fontSize: 14)),
+                    Expanded(
+                      child: Text(
+                        'Yêu cầu hoàn tiền của bạn đã chờ quá 2 ngày',
+                        style: TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () {
+              // TODO: Thêm link liên hệ CSKH hoặc hotline
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Row(
+                    children: [
+                      Icon(Icons.support_agent, color: Color(0xFF3498DB)),
+                      SizedBox(width: 8),
+                      Text('Liên hệ CSKH'),
+                    ],
+                  ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Hotline: 1900 1234', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      SizedBox(height: 8),
+                      Text('Email: support@kl10.vn'),
+                      SizedBox(height: 8),
+                      Text('Thời gian: 8:00 - 22:00 hàng ngày'),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Đóng'),
+                    ),
+                  ],
+                ),
+              );
+            },
+            icon: Icon(Icons.phone, size: 20),
+            label: Text(
+              'LIÊN HỆ NGAY',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Color(0xFFE74C3C),
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
