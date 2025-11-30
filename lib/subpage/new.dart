@@ -32,47 +32,66 @@ class _NewsPageState extends State<NewsPage> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Header nhỏ cho trang
+        // Header mới - tất cả trong một hàng
         Container(
-          margin: const EdgeInsets.only(top: 10), // 👈 cách ra phía trên 20 đơn vị
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Row(
-            children: [
-              Icon(Icons.notifications, color: Color(0xFFC44536), size: 24),
-              SizedBox(width: 8),
-              Text(
-                'Thông báo',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF2C3E50),
-                ),
-              ),
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.only(top: 8, left: 16, right: 16, bottom: 8),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 6,
+                color: Colors.black26,
+                offset: Offset(0, 3),
+              )
             ],
           ),
-        ),
-
-        // Thanh filter & actions
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: Row(
             children: [
-              FilterChip(
-                label: Text('Chỉ hiện chưa đọc', style: TextStyle(fontSize: 13)),
-                selected: _onlyUnread,
-                selectedColor: Color(0xFFC44536).withOpacity(0.2),
-                checkmarkColor: Color(0xFFC44536),
-                onSelected: _currentUser != null
-                    ? (v) => setState(() => _onlyUnread = v)
-                    : null,
+              // Tiêu đề
+              Row(
+                children: [
+                  Icon(Icons.notifications, color: Color(0xFFC44536), size: 24),
+                  SizedBox(width: 8),
+                  Text(
+                    'Thông báo',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF2C3E50),
+                    ),
+                  ),
+                ],
               ),
               const Spacer(),
-              if (_currentUser != null)
-                TextButton.icon(
-                  onPressed: _markAllAsRead,
-                  icon: Icon(Icons.done_all, size: 18, color: Color(0xFFC44536)),
-                  label: Text('Đánh dấu đã đọc', style: TextStyle(color: Color(0xFFC44536))),
-                ),
+              // Các nút lọc và action
+              Row(
+                children: [
+                  FilterChip(
+                    label: Text('Chưa đọc', style: TextStyle(fontSize: 12)),
+                    selected: _onlyUnread,
+                    selectedColor: Color(0xFFC44536).withOpacity(0.2),
+                    checkmarkColor: Color(0xFFC44536),
+                    onSelected: _currentUser != null
+                        ? (v) => setState(() => _onlyUnread = v)
+                        : null,
+                  ),
+                  const SizedBox(width: 8),
+                  if (_currentUser != null)
+                    TextButton.icon(
+                      onPressed: _markAllAsRead,
+                      icon: Icon(Icons.done_all, size: 16, color: Color(0xFFC44536)),
+                      label: Text('Đánh dấu\nđã đọc',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Color(0xFFC44536),
+                          height: 1.1,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
         ),
@@ -84,7 +103,6 @@ class _NewsPageState extends State<NewsPage> {
       ],
     );
   }
-
   Widget _buildNotificationList() {
     return StreamBuilder<List<NotificationItem>>(
       stream: _getCombinedNotificationsStream(),

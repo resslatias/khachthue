@@ -29,247 +29,262 @@ class _MePageView extends StatelessWidget {
   final User? user;
 
   const _MePageView({this.user});
-
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.fromLTRB(3, 8, 16, 16),
-          child: Row(
-            children: [
-              Icon(Icons.person, color: Color(0xFFC44536), size: 24),
-              SizedBox(width: 8),
-              Text(
-                'Tài khoản & Cài đặt',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF2C3E50),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // SECTION 1: TÀI KHOẢN (chỉ hiển thị khi đã đăng nhập)
-        if (user != null) ...[
-          _SectionHeader(
-            icon: Icons.person_outline,
-            title: 'Tài khoản',
-          ),
-          const SizedBox(height: 12),
-          _MenuCard(
-            items: [
-              _MenuItem(
-                icon: Icons.person,
-                title: 'Thông tin cá nhân',
-                subtitle: 'Quản lý thông tin cá nhân của bạn',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => UserProfilePage(userId: user!.uid),
-                  ),
-                ),
-              ),
-              _MenuDivider(),
-              _MenuItem(
-                icon: Icons.lock,
-                title: 'Đổi mật khẩu',
-                subtitle: 'Thay đổi mật khẩu đăng nhập',
-                onTap: () => _showChangePasswordDialog(context),
-              ),
-              _MenuDivider(),
-              _MenuItem(
-                icon: Icons.favorite,
-                title: 'Sân ưa thích',
-                subtitle: 'Danh sách sân bạn đã lưu',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LikePage()),
-                ),
-              ),
-              _MenuDivider(),
-              _MenuItem(
-                icon: Icons.comment,
-                title: 'Bình luận của bạn',
-                subtitle: 'Xem tất cả bình luận đã đăng',
-                onTap: () => _showComingSoon(context),
-              ),
-              _MenuDivider(),
-              _MenuItem(
-                icon: Icons.comment,
-                title: 'Đơn chờ hoàn tiền',
-                subtitle: 'Danh sách yêu cầu hoàn tiền của bạn!',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const RefundPage()),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-        ],
-
-        // Nếu chưa đăng nhập, hiển thị card yêu cầu đăng nhập
-        if (user == null) ...[
-          _SectionHeader(
-            icon: Icons.person_outline,
-            title: 'Tài khoản',
-          ),
-          const SizedBox(height: 12),
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Header - không có padding
           Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(top: 12, left: 16, right: 16, bottom: 12),
+            decoration: const BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
+                  blurRadius: 6,
+                  color: Colors.black26,
+                  offset: Offset(0, 3),
+                )
               ],
             ),
-            child: Column(
+            child: Row(
               children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        Color(0xFFC44536).withOpacity(0.1),
-                        Color(0xFFE74C3C).withOpacity(0.1),
-                      ],
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.account_circle_outlined,
-                    size: 50,
-                    color: Color(0xFFC44536),
-                  ),
-                ),
-                const SizedBox(height: 16),
                 Text(
-                  'Bạn cần đăng nhập',
+                  'Tài khoản & Cài đặt',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2C3E50),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Đăng nhập để quản lý thông tin cá nhân,\nxem sân yêu thích và nhiều tính năng khác',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF7F8C8D),
-                    height: 1.5,
+              ],
+            ),
+          ),
+
+          // Nội dung với padding
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                // SECTION 1: TÀI KHOẢN (chỉ hiển thị khi đã đăng nhập)
+                if (user != null) ...[
+                  _SectionHeader(
+                    icon: Icons.person_outline,
+                    title: 'Tài khoản',
                   ),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context, rootNavigator: true).pushNamed('/login');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFFC44536),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                    shape: RoundedRectangleBorder(
+                  const SizedBox(height: 12),
+                  _MenuCard(
+                    items: [
+                      _MenuItem(
+                        icon: Icons.person,
+                        title: 'Thông tin cá nhân',
+                        subtitle: 'Quản lý thông tin cá nhân của bạn',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => UserProfilePage(userId: user!.uid),
+                          ),
+                        ),
+                      ),
+                      _MenuDivider(),
+                      _MenuItem(
+                        icon: Icons.lock,
+                        title: 'Đổi mật khẩu',
+                        subtitle: 'Thay đổi mật khẩu đăng nhập',
+                        onTap: () => _showChangePasswordDialog(context),
+                      ),
+                      _MenuDivider(),
+                      _MenuItem(
+                        icon: Icons.favorite,
+                        title: 'Sân ưa thích',
+                        subtitle: 'Danh sách sân bạn đã lưu',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const LikePage()),
+                        ),
+                      ),
+                      /*_MenuDivider(),
+                      _MenuItem(
+                        icon: Icons.comment,
+                        title: 'Bình luận của bạn',
+                        subtitle: 'Xem tất cả bình luận đã đăng',
+                        onTap: () => _showComingSoon(context),
+                      ),*/
+                      _MenuDivider(),
+                      _MenuItem(
+                        icon: Icons.comment,
+                        title: 'Đơn chờ hoàn tiền',
+                        subtitle: 'Danh sách yêu cầu hoàn tiền của bạn!',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const RefundPage()),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // Nếu chưa đăng nhập, hiển thị card yêu cầu đăng nhập
+                if (user == null) ...[
+                  _SectionHeader(
+                    icon: Icons.person_outline,
+                    title: 'Tài khoản',
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
-                    elevation: 2,
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                Color(0xFFC44536).withOpacity(0.1),
+                                Color(0xFFE74C3C).withOpacity(0.1),
+                              ],
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.account_circle_outlined,
+                            size: 50,
+                            color: Color(0xFFC44536),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Bạn cần đăng nhập',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2C3E50),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Đăng nhập để quản lý thông tin cá nhân,\nxem sân yêu thích và nhiều tính năng khác',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF7F8C8D),
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context, rootNavigator: true).pushNamed('/login');
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFFC44536),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 2,
+                          ),
+                          child: const Text(
+                            'Đăng nhập ngay',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: const Text(
-                    'Đăng nhập ngay',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // SECTION 2: CÀI ĐẶT (luôn hiển thị)
+                _SectionHeader(
+                  icon: Icons.settings_outlined,
+                  title: 'Cài đặt',
                 ),
+                const SizedBox(height: 12),
+                _MenuCard(
+                  items: [
+                    _MenuItem(
+                      icon: Icons.info,
+                      title: 'Thông tin ứng dụng',
+                      subtitle: 'Phiên bản 1.0.0',
+                      onTap: () => _showAboutDialog(context),
+                    ),
+                    _MenuDivider(),
+                    _MenuItem(
+                      icon: Icons.support_agent,
+                      title: 'Liên hệ chăm sóc khách hàng',
+                      subtitle: 'Hỗ trợ 24/7',
+                      onTap: () => _showSupportDialog(context),
+                    ),
+                    _MenuDivider(),
+                    _MenuItem(
+                      icon: Icons.privacy_tip,
+                      title: 'Chính sách & Điều khoản',
+                      subtitle: 'Quyền riêng tư và điều khoản sử dụng',
+                      onTap: () => _showComingSoon(context),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                // Nút đăng xuất (chỉ hiển thị khi đã đăng nhập)
+                if (user != null) ...[
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ListTile(
+                      leading: Container(
+                        padding: EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.logout, color: Colors.red),
+                      ),
+                      title: Text(
+                        'Đăng xuất',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      trailing: Icon(Icons.chevron_right, color: Colors.red),
+                      onTap: () => _showLogoutDialog(context),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
               ],
             ),
           ),
-          const SizedBox(height: 24),
         ],
-
-        // SECTION 2: CÀI ĐẶT (luôn hiển thị)
-        _SectionHeader(
-          icon: Icons.settings_outlined,
-          title: 'Cài đặt',
-        ),
-        const SizedBox(height: 12),
-        _MenuCard(
-          items: [
-            _MenuItem(
-              icon: Icons.info,
-              title: 'Thông tin ứng dụng',
-              subtitle: 'Phiên bản 1.0.0',
-              onTap: () => _showAboutDialog(context),
-            ),
-            _MenuDivider(),
-            _MenuItem(
-              icon: Icons.support_agent,
-              title: 'Liên hệ chăm sóc khách hàng',
-              subtitle: 'Hỗ trợ 24/7',
-              onTap: () => _showSupportDialog(context),
-            ),
-            _MenuDivider(),
-            _MenuItem(
-              icon: Icons.privacy_tip,
-              title: 'Chính sách & Điều khoản',
-              subtitle: 'Quyền riêng tư và điều khoản sử dụng',
-              onTap: () => _showComingSoon(context),
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 24),
-
-        // Nút đăng xuất (chỉ hiển thị khi đã đăng nhập)
-        if (user != null) ...[
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: ListTile(
-              leading: Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.logout, color: Colors.red),
-              ),
-              title: Text(
-                'Đăng xuất',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              trailing: Icon(Icons.chevron_right, color: Colors.red),
-              onTap: () => _showLogoutDialog(context),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ],
-      ],
+      ),
     );
   }
-
   // Dialog đổi mật khẩu
   void _showChangePasswordDialog(BuildContext context) {
     showDialog(
@@ -458,7 +473,7 @@ class _MePageView extends StatelessWidget {
                               ),
                               SizedBox(height: 4),
                               Text(
-                                '0123 456 789',
+                                '0915033623',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
@@ -488,7 +503,7 @@ class _MePageView extends StatelessWidget {
                               ),
                               SizedBox(height: 4),
                               Text(
-                                'support@badminton.com',
+                                'n2ui9323@gmail.com',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,

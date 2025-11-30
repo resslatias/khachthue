@@ -690,7 +690,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
           Container(
             //height: kToolbarHeight + MediaQuery.of(context).padding.top,
             padding: EdgeInsets.only(
-              top: 10,
+              top: 8,
               left: 8,
               right: 8,
               bottom: 8,
@@ -717,7 +717,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                         Text(
                           ten,
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF2C3E50),
                           ),
@@ -764,7 +764,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                       Text(
                         'Yêu thích',
                         style: TextStyle(
-                          fontSize: 9,
+                          fontSize: 8,
                           color: Color(0xFF2C3E50),
                           fontWeight: FontWeight.w500,
                         ),
@@ -777,7 +777,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
 
                 // Nút đặt lịch
                 Container(
-                  width: 50,
+                  width: 40,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -814,7 +814,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                       Text(
                         'Đặt lịch',
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 8,
                           color: Color(0xFF2C3E50),
                           fontWeight: FontWeight.w500,
                         ),

@@ -33,8 +33,14 @@ class _RefundPageView extends StatefulWidget {
 class _RefundPageViewState extends State<_RefundPageView> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   List<Map<String, dynamic>> refundOrders = [];
+  List<Map<String, dynamic>> filteredRefundOrders = [];
   bool isLoading = true;
   String? errorMessage;
+
+  // Filter states
+  String _statusFilter = 'all'; // all, da_hoan, chua_hoan
+  DateTime? _startDate;
+  DateTime? _endDate;
 
   @override
   void initState() {
@@ -55,6 +61,7 @@ class _RefundPageViewState extends State<_RefundPageView> {
       setState(() {
         isLoading = false;
         refundOrders = [];
+        filteredRefundOrders = [];
       });
       return;
     }
@@ -67,7 +74,6 @@ class _RefundPageViewState extends State<_RefundPageView> {
     try {
       final userId = widget.user!.uid;
 
-      // ✅ Truy vấn theo cấu trúc mới: cho_hoan_tien/{userId}/co_so/{coSoId}/don_dat/{maDon}
       final coSoSnapshot = await _firestore
           .collection('cho_hoan_tien')
           .doc(userId)
@@ -76,27 +82,18 @@ class _RefundPageViewState extends State<_RefundPageView> {
 
       List<Map<String, dynamic>> allOrders = [];
 
-      debugPrint('📦 Số cơ sở: ${coSoSnapshot.docs.length}');
-
-      // Duyệt qua tất cả các cơ sở
       for (var coSoDoc in coSoSnapshot.docs) {
         final coSoId = coSoDoc.id;
         final coSoData = coSoDoc.data();
 
-        debugPrint('🏢 Đang xử lý cơ sở: $coSoId');
-
-        // ✅ BỎ orderBy - chỉ lấy tất cả đơn hàng
         final donDatSnapshot = await _firestore
             .collection('cho_hoan_tien')
             .doc(userId)
             .collection('co_so')
             .doc(coSoId)
             .collection('don_dat')
-            .get(); // ← BỎ orderBy
+            .get();
 
-        debugPrint('  📋 Số đơn của cơ sở $coSoId: ${donDatSnapshot.docs.length}');
-
-        // Thêm thông tin cơ sở vào mỗi đơn hàng
         for (var donDatDoc in donDatSnapshot.docs) {
           var donDatData = donDatDoc.data();
 
@@ -104,31 +101,26 @@ class _RefundPageViewState extends State<_RefundPageView> {
             ...donDatData,
             'doc_id': donDatDoc.id,
             'co_so_id': coSoId,
-            // Ưu tiên lấy tên cơ sở từ document co_so, nếu không có thì lấy từ đơn hàng
             'ten_co_so': coSoData['ten_co_so'] ?? donDatData['ten_co_so'] ?? '',
-            // Ưu tiên lấy địa chỉ từ đơn hàng, nếu không có thì lấy từ document co_so
             'dia_chi_co_so': donDatData['dia_chi_co_so'] ?? coSoData['dia_chi_co_so'] ?? '',
           };
 
           allOrders.add(orderData);
-          debugPrint('    ✅ Thêm đơn: ${donDatDoc.id}');
         }
       }
 
-      // ✅ Sắp xếp toàn bộ danh sách theo thời gian yêu cầu hủy (ở trong code, không dùng Firestore)
       allOrders.sort((a, b) {
         final Timestamp? aTime = a['ngay_yeu_cau_huy'];
         final Timestamp? bTime = b['ngay_yeu_cau_huy'];
         if (aTime == null && bTime == null) return 0;
         if (aTime == null) return 1;
         if (bTime == null) return -1;
-        return bTime.compareTo(aTime); // descending - mới nhất lên đầu
+        return bTime.compareTo(aTime);
       });
-
-      debugPrint('✅ Tổng: ${allOrders.length} đơn chờ hoàn tiền');
 
       setState(() {
         refundOrders = allOrders;
+        filteredRefundOrders = allOrders;
         isLoading = false;
       });
     } catch (e, stackTrace) {
@@ -141,10 +133,148 @@ class _RefundPageViewState extends State<_RefundPageView> {
     }
   }
 
+// Thay thế hàm _applyFilters() hiện tại bằng code này:
+
+  void _applyFilters() {
+    List<Map<String, dynamic>> result = refundOrders;
+
+    // Filter by status
+    if (_statusFilter != 'all') {
+      result = result.where((order) {
+        final daHoanTien = order['da_hoan_tien'] as bool? ?? false;
+        return _statusFilter == 'da_hoan' ? daHoanTien : !daHoanTien;
+      }).toList();
+    }
+
+    // Filter by date - SỬA LẠI PHẦN NÀY
+    if (_startDate != null || _endDate != null) {
+      result = result.where((order) {
+        final ngayYeuCauHuy = order['ngay_yeu_cau_huy'] as Timestamp?;
+        if (ngayYeuCauHuy == null) return false;
+
+        final ngay = ngayYeuCauHuy.toDate();
+
+        // Chuẩn hóa ngày về đầu ngày (00:00:00) để so sánh chính xác
+        final ngayChuan = DateTime(ngay.year, ngay.month, ngay.day);
+
+        if (_startDate != null) {
+          final startChuan = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+          // Ngày phải >= ngày bắt đầu
+          if (ngayChuan.isBefore(startChuan)) {
+            return false;
+          }
+        }
+
+        if (_endDate != null) {
+          final endChuan = DateTime(_endDate!.year, _endDate!.month, _endDate!.day);
+          // Ngày phải <= ngày kết thúc
+          if (ngayChuan.isAfter(endChuan)) {
+            return false;
+          }
+        }
+
+        return true;
+      }).toList();
+    }
+
+    setState(() {
+      filteredRefundOrders = result;
+    });
+  }
+
+// BONUS: Thêm hàm này để test và debug
+  void _debugFilterDates() {
+    debugPrint('=== DEBUG FILTER ===');
+    debugPrint('Start Date: ${_startDate?.toString()}');
+    debugPrint('End Date: ${_endDate?.toString()}');
+    debugPrint('Total orders: ${refundOrders.length}');
+    debugPrint('Filtered orders: ${filteredRefundOrders.length}');
+
+    for (var order in refundOrders) {
+      final ngayYeuCauHuy = order['ngay_yeu_cau_huy'] as Timestamp?;
+      if (ngayYeuCauHuy != null) {
+        final ngay = ngayYeuCauHuy.toDate();
+        debugPrint('Order ${order['ma_don']}: ${ngay.day}/${ngay.month}/${ngay.year}');
+      }
+    }
+  }
+
+  void _showDateFilterDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Lọc theo khoảng ngày'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Từ ngày'),
+              subtitle: _startDate == null
+                  ? const Text('Chưa chọn')
+                  : Text('${_startDate!.day}/${_startDate!.month}/${_startDate!.year}'),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _startDate ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) {
+                  setState(() => _startDate = picked);
+                }
+                Navigator.pop(context);
+                _showDateFilterDialog(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Đến ngày'),
+              subtitle: _endDate == null
+                  ? const Text('Chưa chọn')
+                  : Text('${_endDate!.day}/${_endDate!.month}/${_endDate!.year}'),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _endDate ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) {
+                  setState(() => _endDate = picked);
+                }
+                Navigator.pop(context);
+                _showDateFilterDialog(context);
+              },
+            ),
+            if (_startDate != null || _endDate != null)
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _startDate = null;
+                    _endDate = null;
+                  });
+                  _applyFilters();
+                  Navigator.pop(context);
+                },
+                child: const Text('Xóa lọc ngày'),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _formatCurrency(int amount) {
     return amount.toString().replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-          (Match m) => '${m[1]},',
+          (m) => '${m[1]},',
     );
   }
 
@@ -178,51 +308,136 @@ class _RefundPageViewState extends State<_RefundPageView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
       backgroundColor: Color(0xFFF8F9FA),
-      appBar:
-
-      AppBar(
-        toolbarHeight: 28,
-        //primary: false,
-        backgroundColor: Colors.white,
-        elevation: 1,
-        leading: IconButton(
-          padding: EdgeInsets.only(top: 8.0),
-          icon: Icon(Icons.arrow_back, color: Color(0xFF2C3E50)),
-          onPressed: () => Navigator.pop(context),
-        ),
-
-        title: Padding(
-          padding: EdgeInsets.only(top: 8.0), // Thêm padding top cho title
-          child: Text(
-            'Đơn chờ hoàn tiền',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2C3E50)
+      body: Column(
+        children: [
+          // Header mới với nút quay lại
+          Container(
+            //margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.only(top: 16, left: 16, right: 16, bottom: 16),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: 6,
+                  color: Colors.black26,
+                  offset: Offset(0, 3),
+                )
+              ],
+            ),
+            child: Row(
+              children: [
+                // Nút quay lại
+                IconButton(
+                  icon: Icon(Icons.arrow_back, color: Color(0xFF2C3E50)),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                SizedBox(width: 8),
+                // Tiêu đề
+                Text(
+                  'Đơn chờ hoàn tiền',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                // Các nút lọc
+                Row(
+                  children: [
+                    // Nút lọc trạng thái
+                    PopupMenuButton<String>(
+                      onSelected: (val) {
+                        setState(() => _statusFilter = val);
+                        _applyFilters();
+                      },
+                      icon: const Icon(Icons.filter_list, size: 20),
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(value: 'all', child: Text('Tất cả')),
+                        const PopupMenuItem(value: 'da_hoan', child: Text('Đã hoàn')),
+                        const PopupMenuItem(value: 'chua_hoan', child: Text('Chưa hoàn')),
+                      ],
+                    ),
+                    const SizedBox(width: 8),
+                    // Nút lọc ngày
+                    InkWell(
+                      onTap: () => _showDateFilterDialog(context),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.calendar_today, size: 20),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Lọc ngày',
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ),
 
-        centerTitle: true,
-        actions: [
-          IconButton(
-            padding: EdgeInsets.only(top: 8.0),
-            icon: Icon(Icons.refresh, color: Color(0xFFC44536)),
-            onPressed: _loadRefundOrders,
+          // Hiển thị các bộ lọc đang active
+          if (_statusFilter != 'all' || _startDate != null || _endDate != null)
+            Container(
+              padding: const EdgeInsets.all(12),
+              color: Colors.grey[100],
+              child: Row(
+                children: [
+                  const Text('Bộ lọc: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      if (_statusFilter != 'all')
+                        Chip(
+                          label: Text(_statusFilter == 'da_hoan' ? 'Đã hoàn' : 'Chưa hoàn'),
+                          onDeleted: () {
+                            setState(() => _statusFilter = 'all');
+                            _applyFilters();
+                          },
+                        ),
+                      if (_startDate != null)
+                        Chip(
+                          label: Text('Từ: ${_startDate!.day}/${_startDate!.month}/${_startDate!.year}'),
+                          onDeleted: () {
+                            setState(() => _startDate = null);
+                            _applyFilters();
+                          },
+                        ),
+                      if (_endDate != null)
+                        Chip(
+                          label: Text('Đến: ${_endDate!.day}/${_endDate!.month}/${_endDate!.year}'),
+                          onDeleted: () {
+                            setState(() => _endDate = null);
+                            _applyFilters();
+                          },
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+          Expanded(
+            child: widget.user == null
+                ? _buildLoginRequired()
+                : isLoading
+                ? Center(child: CircularProgressIndicator(color: Color(0xFFC44536)))
+                : errorMessage != null
+                ? _buildErrorView()
+                : refundOrders.isEmpty
+                ? _buildEmptyView()
+                : _buildOrdersList(),
           ),
         ],
       ),
-      body: widget.user == null
-          ? _buildLoginRequired()
-          : isLoading
-          ? Center(child: CircularProgressIndicator(color: Color(0xFFC44536)))
-          : errorMessage != null
-          ? _buildErrorView()
-          : refundOrders.isEmpty
-          ? _buildEmptyView()
-          : _buildOrdersList(),
     );
   }
 
@@ -309,27 +524,30 @@ class _RefundPageViewState extends State<_RefundPageView> {
       color: Color(0xFFC44536),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: refundOrders.length + 1, // +1 cho warning
+        itemCount: filteredRefundOrders.length + 1, // +1 cho warning
         itemBuilder: (context, index) {
-          // Hiển thị warning ở cuối
-          if (index == refundOrders.length) {
+          // Hiển thị warning ở đầu
+          if (index == 0) {
             return _buildWarningSection();
           }
 
-          final order = refundOrders[index];
-          return _RefundOrderCard(
-            order: order,
-            onTap: () => _showRefundDetail(order),
+          final orderIndex = index - 1;
+          final order = filteredRefundOrders[orderIndex];
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: _RefundOrderCard(
+              order: order,
+              onTap: () => _showRefundDetail(order),
+            ),
           );
         },
       ),
     );
   }
 
-// Thêm widget warning mới
   Widget _buildWarningSection() {
     return Container(
-      margin: const EdgeInsets.only(top: 8, bottom: 20),
+      margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -417,7 +635,6 @@ class _RefundPageViewState extends State<_RefundPageView> {
           SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () {
-              // TODO: Thêm link liên hệ CSKH hoặc hotline
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(

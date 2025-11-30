@@ -35,6 +35,8 @@ class _BeforPageView extends StatefulWidget {
 class _BeforPageViewState extends State<_BeforPageView> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   late Stream<QuerySnapshot> _donDatStream;
+  DateTime? _startDate;
+  DateTime? _endDate;
 
   @override
   void initState() {
@@ -62,6 +64,77 @@ class _BeforPageViewState extends State<_BeforPageView> {
         .collection('don_dat')
         .orderBy('ngay_tao', descending: true)
         .snapshots();
+  }
+
+  void _showDateFilterDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Lọc theo khoảng ngày'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Từ ngày'),
+              subtitle: _startDate == null
+                  ? const Text('Chưa chọn')
+                  : Text('${_startDate!.day}/${_startDate!.month}/${_startDate!.year}'),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _startDate ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) {
+                  setState(() => _startDate = picked);
+                }
+                Navigator.pop(context);
+                _showDateFilterDialog(context);
+              },
+            ),
+            ListTile(
+              title: const Text('Đến ngày'),
+              subtitle: _endDate == null
+                  ? const Text('Chưa chọn')
+                  : Text('${_endDate!.day}/${_endDate!.month}/${_endDate!.year}'),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _endDate ?? DateTime.now(),
+                  firstDate: DateTime(2000),
+                  lastDate: DateTime(2100),
+                );
+                if (picked != null) {
+                  setState(() => _endDate = picked);
+                }
+                Navigator.pop(context);
+                _showDateFilterDialog(context);
+              },
+            ),
+            if (_startDate != null || _endDate != null)
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _startDate = null;
+                    _endDate = null;
+                  });
+                  Navigator.pop(context);
+                },
+                child: const Text('Xóa lọc ngày'),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _formatCurrency(int amount) {
@@ -136,23 +209,80 @@ class _BeforPageViewState extends State<_BeforPageView> {
 
     return Column(
       children: [
+        // Header với nút lọc ngày
         Container(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          padding: const EdgeInsets.only(top: 8, left: 16, right: 16, bottom: 8),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 6,
+                color: Colors.black26,
+                offset: Offset(0, 3),
+              )
+            ],
+          ),
           child: Row(
             children: [
-              Icon(Icons.history, color: Color(0xFFC44536), size: 24),
-              SizedBox(width: 8),
-              Text(
+              // Tiêu đề
+              const Text(
                 'Lịch sử đặt sân',
                 style: TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF2C3E50),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              // Nút lọc ngày
+              InkWell(
+                onTap: () => _showDateFilterDialog(context),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.calendar_today, size: 20),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Lọc ngày',
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
         ),
+
+        // Hiển thị bộ lọc đang active
+        if (_startDate != null || _endDate != null)
+          Container(
+            padding: const EdgeInsets.all(12),
+            color: Colors.grey[100],
+            child: Row(
+              children: [
+                const Text('Bộ lọc: ', style: TextStyle(fontWeight: FontWeight.bold)),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    if (_startDate != null)
+                      Chip(
+                        label: Text('Từ: ${_startDate!.day}/${_startDate!.month}/${_startDate!.year}'),
+                        onDeleted: () => setState(() => _startDate = null),
+                      ),
+                    if (_endDate != null)
+                      Chip(
+                        label: Text('Đến: ${_endDate!.day}/${_endDate!.month}/${_endDate!.year}'),
+                        onDeleted: () => setState(() => _endDate = null),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: _donDatStream,
@@ -194,7 +324,52 @@ class _BeforPageViewState extends State<_BeforPageView> {
                 );
               }
 
-              final orders = snapshot.data!.docs;
+              var orders = snapshot.data!.docs;
+
+              // Lọc theo khoảng ngày
+              if (_startDate != null || _endDate != null) {
+                orders = orders.where((doc) {
+                  final order = doc.data() as Map<String, dynamic>;
+                  final ngayDatStr = order['ngay_dat'] as String?;
+                  if (ngayDatStr == null) return false;
+
+                  try {
+                    final parts = ngayDatStr.split('_');
+                    final ngayDat = DateTime(
+                      int.parse(parts[2]),  // năm
+                      int.parse(parts[1]),  // tháng
+                      int.parse(parts[0]),  // ngày
+                    );
+
+                    if (_startDate != null && ngayDat.isBefore(_startDate!)) {
+                      return false;
+                    }
+                    if (_endDate != null && ngayDat.isAfter(_endDate!)) {
+                      return false;
+                    }
+                    return true;
+                  } catch (e) {
+                    return false;
+                  }
+                }).toList();
+              }
+
+              if (orders.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.search, size: 60, color: Color(0xFFBDC3C7)),
+                      SizedBox(height: 16),
+                      Text(
+                        'Không có đơn đặt sân trong khoảng ngày đã chọn',
+                        style: TextStyle(fontSize: 16, color: Color(0xFF7F8C8D)),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              }
 
               return ListView.builder(
                 padding: const EdgeInsets.all(16),
@@ -217,6 +392,7 @@ class _BeforPageViewState extends State<_BeforPageView> {
   }
 }
 
+// Giữ nguyên class _OrderCard như cũ
 class _OrderCard extends StatelessWidget {
   final Map<String, dynamic> order;
   final VoidCallback onTap;
@@ -618,7 +794,7 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
     }
   }
 
-  /// ✅ KIỂM TRA XEM CÓ THỂ HỦY KHÔNG
+  /// ✅ KIỂM TRA XEM CÓ THỂ HỦY KHÔNG - ĐÃ THAY ĐỔI TỪ 2 GIỜ LÊN 24 GIỜ
   bool _canCancelOrder() {
     final trangThai = widget.order['trang_thai'] as String? ?? '';
 
@@ -652,11 +828,11 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
       // Tạo DateTime của giờ sân sớm nhất
       final sanStartTime = DateTime(year, month, day, earliestHour, 0);
 
-      // Kiểm tra: hiện tại + 2 giờ < giờ sân
+      // THAY ĐỔI: Kiểm tra: hiện tại + 24 giờ < giờ sân (thay vì 2 giờ)
       final now = DateTime.now();
-      final twoHoursLater = now.add(Duration(hours: 2));
+      final twentyFourHoursLater = now.add(Duration(hours: 24));
 
-      return twoHoursLater.isBefore(sanStartTime);
+      return twentyFourHoursLater.isBefore(sanStartTime);
 
     } catch (e) {
       debugPrint('Lỗi kiểm tra thời gian hủy: $e');
@@ -693,7 +869,7 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
               ),
               SizedBox(height: 8),
               Text(
-                '• Đơn chỉ có thể hủy nếu thời gian còn lại lớn hơn 2 giờ',
+                '• Đơn chỉ có thể hủy nếu thời gian còn lại lớn hơn 24 giờ', // ĐÃ THAY ĐỔI
                 style: TextStyle(fontSize: 14, height: 1.5),
               ),
               SizedBox(height: 16),
@@ -807,7 +983,6 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
   }
 
   /// 🔥 XỬ LÝ HỦY ĐƠN - CORE LOGIC
-  /// 🔥 XỬ LÝ HỦY ĐƠN - CORE LOGIC (CẬP NHẬT)
   Future<void> _processCancelOrder() async {
     final maDon = widget.order['ma_don'] as String? ?? '';
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
@@ -897,7 +1072,7 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
       'ngay_yeu_cau_huy': FieldValue.serverTimestamp(),
     });
 
-    // 5️⃣ Tạo bản ghi cho_hoan_tien_2 (cho chủ sân truy vấn) - MỚI
+    // 5️⃣ Tạo bản ghi cho_hoan_tien_2 (cho chủ sân truy vấn)
     await firestore
         .collection('cho_hoan_tien_2')
         .doc(coSoId)
@@ -949,7 +1124,7 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
       'ngay_tao': FieldValue.serverTimestamp(),
     });
 
-    // 7️⃣ Tạo thông báo cho chủ sân - MỚI
+    // 7️⃣ Tạo thông báo cho chủ sân
     await firestore
         .collection('thong_bao_chu_san')
         .doc(coSoId)
@@ -1459,6 +1634,7 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
   }
 }
 
+// Giữ nguyên class _CountdownTimer như cũ
 class _CountdownTimer extends StatefulWidget {
   final DateTime timeup;
 
