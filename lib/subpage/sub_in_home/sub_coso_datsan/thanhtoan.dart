@@ -125,6 +125,209 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
     }
   }
 
+  // hàm nhấn hủy
+  Future<void> _huyDonHang() async {
+    try {
+      String userId = auth.currentUser?.uid ?? 'khachquaduong';
+
+      // Lấy thông tin cần thiết từ đơn
+      String coSoId = donDatData!['co_so_id'] as String? ?? '';
+      String ngayDat = donDatData!['ngay_dat'] as String? ?? '';
+
+      // Tạo timestamp quá khứ (1 giây trước)
+      DateTime pastTime = DateTime.now().subtract(Duration(seconds: 1));
+      Timestamp pastTimestamp = Timestamp.fromDate(pastTime);
+
+      debugPrint('🔄 Bắt đầu hủy đơn ${widget.maDon}...');
+
+      // 1. CẬP NHẬT TIMEUP CHO LICH_SU_KHACH
+      await firestore
+          .collection('lich_su_khach')
+          .doc(userId)
+          .collection('don_dat')
+          .doc(widget.maDon)
+          .update({
+        'timeup': pastTimestamp,
+        //'trang_thai': 'da_huy', // Optional: thêm trạng thái rõ ràng
+      });
+      debugPrint('✅ Đã cập nhật timeup cho lich_su_khach');
+
+      // 2. CẬP NHẬT TIMEUP CHO LICH_SU_SAN
+      await firestore
+          .collection('lich_su_san')
+          .doc(coSoId)
+          .collection('khach_dat')
+          .doc(widget.maDon)
+          .update({
+        'timeup': pastTimestamp,
+       // 'trang_thai': 'da_huy',
+      });
+      debugPrint('✅ Đã cập nhật timeup cho lich_su_san');
+
+      // 3. CẬP NHẬT PAYMENT_TIMEUP CHO DAT_SAN
+      final chiTietSnapshot = await firestore
+          .collection('chi_tiet_dat')
+          .doc(widget.maDon)
+          .collection('danh_sach')
+          .get();
+
+      for (var doc in chiTietSnapshot.docs) {
+        Map<String, dynamic> detail = doc.data();
+        String maSan = detail['ma_san'] as String? ?? '';
+        String gio = detail['gio'] as String? ?? '';
+
+        if (maSan.isNotEmpty && gio.isNotEmpty) {
+          String paymentTimeupKey = '${maSan}_payment_timeup';
+
+          await firestore
+              .collection('dat_san')
+              .doc(coSoId)
+              .collection(ngayDat)
+              .doc(gio)
+              .update({
+            paymentTimeupKey: pastTimestamp,
+          });
+
+          debugPrint('✅ Đã cập nhật payment_timeup cho $maSan tại $gio');
+        }
+      }
+
+      // 4. CẬP NHẬT SO_DON_CHO VÀ SO_DON_CHO_TIME
+      await firestore.collection('nguoi_thue').doc(userId).update({
+        'so_don_cho': FieldValue.increment(-1), // Giảm xuống
+        'so_don_cho_time': FieldValue.delete(), // Xóa thời gian
+      });
+      debugPrint('✅ Đã giảm so_don_cho và xóa so_don_cho_time');
+
+      // 5. GỬI THÔNG BÁO
+      await firestore
+          .collection('thong_bao')
+          .doc(userId)
+          .collection('notifications')
+          .add({
+        'tieu_de': 'Đơn hàng đã hủy',
+        'noi_dung': 'Bạn đã hủy đơn hàng ${widget.maDon} tại ${donDatData!['ten_co_so'] ?? ''}.',
+        'da_xem_chua': false,
+        'ngay_tao': FieldValue.serverTimestamp(),
+      });
+
+      debugPrint('🎉 Đã hủy đơn hàng thành công');
+
+      // 6. HIỂN thị thông báo và quay lại
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đã hủy đơn hàng thành công'),
+            backgroundColor: Color(0xFF2E8B57),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+
+        // Chờ 1 giây rồi quay lại
+        await Future.delayed(Duration(seconds: 1));
+        Navigator.pop(context);
+      }
+
+    } catch (e, stackTrace) {
+      debugPrint('🔥 Lỗi hủy đơn hàng: $e');
+      debugPrint('Stack trace: $stackTrace');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi hủy đơn: ${e.toString()}'),
+            backgroundColor: Color(0xFFC44536),
+          ),
+        );
+      }
+    }
+  }
+
+// HÀM HIỂN THỊ DIALOG XÁC NHẬN HỦY
+  Future<void> _showCancelConfirmDialog() async {
+    final shouldCancel = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Color(0xFFF39C12)),
+            SizedBox(width: 8),
+            Text('Xác nhận hủy đơn'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Bạn có chắc chắn muốn hủy đơn hàng này không?'),
+            SizedBox(height: 8),
+            Text(
+              'Mã đơn: ${widget.maDon}',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFC44536),
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Tổng tiền: ${_formatCurrency((donDatData!['tong_tien'] as num?)?.toInt() ?? 0)}đ',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2C3E50),
+              ),
+            ),
+            SizedBox(height: 12),
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Color(0xFFF39C12).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Color(0xFFF39C12).withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 16, color: Color(0xFFF39C12)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Hành động này không thể hoàn tác!',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF7F8C8D),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Không, giữ đơn'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFFC44536),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text('Có, hủy đơn', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldCancel == true) {
+      await _huyDonHang();
+    }
+  }
+
   // taoQR thanh toans
   String _generateQRUrl() {
     final tongTien = (donDatData!['tong_tien'] as num?)?.toInt() ?? 0;
@@ -483,7 +686,7 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
 
           SizedBox(height: 16),
 
-          // Nút mở PayOS Checkout
+// Nút mở PayOS Checkout
           if (checkoutUrl.isNotEmpty)
             SizedBox(
               width: double.infinity,
@@ -518,6 +721,29 @@ class _ThanhToanPageState extends State<ThanhToanPage> {
                 ),
               ),
             ),
+
+// ✅ THÊM NÚT HỦY ĐƠN NGAY SAU NÚT PAYOS
+          SizedBox(height: 12), // Khoảng cách giữa 2 nút
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _showCancelConfirmDialog,
+              icon: Icon(Icons.cancel_outlined, size: 20),
+              label: Text(
+                'Đặt nhầm, hủy đơn này',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Color(0xFFC44536),
+                side: BorderSide(color: Color(0xFFC44536), width: 2),
+                padding: EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
 
           SizedBox(height: 16),
 

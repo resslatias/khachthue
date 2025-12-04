@@ -63,6 +63,8 @@ class AuthService {
         'ho_ten': hoTen.trim(),
         'email': email.trim(),
         'so_dien_thoai': (soDienThoai ?? '').trim(),
+        'so_don_cho':0,
+        'so_don_huy':0,
         'ngay_sinh': null,
         'anh_dai_dien':null,
       }, SetOptions(merge: true));

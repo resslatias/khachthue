@@ -794,8 +794,8 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
     }
   }
 
-  /// ✅ KIỂM TRA XEM CÓ THỂ HỦY KHÔNG - ĐÃ THAY ĐỔI TỪ 2 GIỜ LÊN 24 GIỜ
-  bool _canCancelOrder() {
+  ///  KIỂM TRA XEM CÓ THỂ HỦY KHÔNG
+  Future<bool> _canCancelOrder() async {
     final trangThai = widget.order['trang_thai'] as String? ?? '';
 
     // Chỉ đơn "da_thanh_toan" mới được hủy
@@ -828,11 +828,27 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
       // Tạo DateTime của giờ sân sớm nhất
       final sanStartTime = DateTime(year, month, day, earliestHour, 0);
 
-      // THAY ĐỔI: Kiểm tra: hiện tại + 24 giờ < giờ sân (thay vì 2 giờ)
+      // Kiểm tra: hiện tại + 24 giờ < giờ sân
       final now = DateTime.now();
       final twentyFourHoursLater = now.add(Duration(hours: 24));
 
-      return twentyFourHoursLater.isBefore(sanStartTime);
+      if (twentyFourHoursLater.isAfter(sanStartTime)) {
+        return false; // Quá gần giờ đá
+      }
+
+      final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+      if (userId.isEmpty) return false;
+
+      final userDoc = await FirebaseFirestore.instance
+          .collection('nguoi_thue')
+          .doc(userId)
+          .get();
+
+      final soDonHuy = (userDoc.data()?['so_don_huy'] as num?)?.toInt() ?? 0;
+
+      if (soDonHuy >= 1) return false;
+
+      return true;
 
     } catch (e) {
       debugPrint('Lỗi kiểm tra thời gian hủy: $e');
@@ -840,8 +856,47 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
     }
   }
 
-  /// 🔥 XỬ LÝ HỦY ĐƠN
+  ///  XỬ LÝ HỦY ĐƠN
   Future<void> _handleCancelOrder() async {
+    // ✅ THÊM: Kiểm tra so_don_huy trước khi hiển thị dialog
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    if (userId.isEmpty) return;
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('nguoi_thue')
+        .doc(userId)
+        .get();
+
+    final soDonHuy = (userDoc.data()?['so_don_huy'] as num?)?.toInt() ?? 0;
+
+    if (soDonHuy >= 1) {
+      // Hiển thị thông báo lỗi
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.block, color: Color(0xFFE74C3C), size: 28),
+              SizedBox(width: 12),
+              Text('Không thể hủy', style: TextStyle(fontSize: 18)),
+            ],
+          ),
+          content: Text(
+            'Bạn đang có đơn chờ hoàn tiền. Vui lòng chờ xử lý xong trước khi hủy đơn khác.',
+            style: TextStyle(fontSize: 15, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Đã hiểu', style: TextStyle(color: Color(0xFF7F8C8D))),
+            ),
+          ],
+        ),
+      );
+      return; // Dừng lại, không cho hủy
+    }
+
     // Dialog 1: Chính sách hủy
     final confirmed1 = await showDialog<bool>(
       context: context,
@@ -1137,9 +1192,17 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
       'user_id': userId,
       'ngay_tao': FieldValue.serverTimestamp(),
     });
+    // 8️⃣ ✅ THÊM: Tăng so_don_huy lên 1
+    await firestore
+        .collection('nguoi_thue')
+        .doc(userId)
+        .update({
+      'so_don_huy': FieldValue.increment(1),
+    });
 
     debugPrint('✅ Đã hủy đơn $maDon thành công');
   }
+
 
   Widget _buildStatusWidget() {
     final trangThai = widget.order['trang_thai'] as String? ?? 'chua_thanh_toan';
@@ -1259,7 +1322,7 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
         timeup != null &&
         timeup.toDate().isAfter(DateTime.now());
 
-    final canCancel = !isLoading && _canCancelOrder();
+    final canCancel = !isLoading && trangThai == 'da_thanh_toan';
 
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
@@ -1374,6 +1437,34 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
                         ),
                         _buildStatusWidget(),
                       ],
+                    ),
+
+// ✅ THÊM: Thông báo điều kiện hủy đơn
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Color(0xFFFFF3CD),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Color(0xFFFFC107)),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline, color: Color(0xFFF57C00), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Điều kiện hủy đơn: Thời gian chờ < 24 giờ và số đơn yêu cầu hoàn tiền tại thời điểm nhỏ hơn 1.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF5D4037),
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
 
                     const SizedBox(height: 24),
@@ -1541,7 +1632,7 @@ class _OrderDetailBottomSheetState extends State<_OrderDetailBottomSheet> {
                             elevation: 2,
                           ),
                           child: Text(
-                            'Đi tới thanh toán',
+                            'Đi tới thanh toán hoặc hủy yêu cầu đặt đơn',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
