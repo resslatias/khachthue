@@ -471,7 +471,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                 ),
                 SizedBox(width: 4), // GIẢM KHOẢNG CÁCH
                 Text(
-                  'Dịch vụ khác',
+                  'Tiện ích khác',
                   style: TextStyle(
                     fontSize: 17, // GIẢM FONT SIZE
                     fontWeight: FontWeight.bold,
@@ -482,7 +482,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             ),
           ),
 
-          // NỘI DUNG DỊCH VỤ
+          // NỘI DUNG tiện ích
           Expanded(
             child: _buildServicesContent(),
           ),
@@ -567,7 +567,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
         child: Padding(
           padding: EdgeInsets.all(16),
           child: Text(
-            'Chưa có thông tin dịch vụ khác',
+            'Chưa có thông tin tiện ích khác',
             style: TextStyle(color: Color(0xFF7F8C8D)),
           ),
         ),
@@ -575,20 +575,23 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
     }
 
     return ListView.builder(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12), // GIẢM PADDING
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       itemCount: dichVuKhac.length,
       itemBuilder: (context, index) {
         final dichVu = dichVuKhac[index] as Map<String, dynamic>;
         final ten = dichVu['ten'] as String? ?? '';
         final gia = dichVu['gia'];
+        final donVi = dichVu['don_vi'] as String? ?? '';
+        final soLuong = dichVu['so_luong'];
 
         if (ten.isEmpty || gia == null) return SizedBox.shrink();
 
         final giaInt = gia is int ? gia : (gia as num).toInt();
+        final soLuongInt = soLuong is int ? soLuong : (soLuong as num?)?.toInt() ?? 0;
 
         return Container(
-          margin: EdgeInsets.only(bottom: 8), // GIẢM MARGIN
-          padding: EdgeInsets.all(12), // GIẢM PADDING
+          margin: EdgeInsets.only(bottom: 8),
+          padding: EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Color(0xFFF8F9FA),
             borderRadius: BorderRadius.circular(12),
@@ -597,14 +600,14 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
           child: Row(
             children: [
               Container(
-                padding: EdgeInsets.all(10), // GIẢM PADDING
+                padding: EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: Color(0xFFC44536).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(Icons.room_service, color: Color(0xFFC44536), size: 20), // GIẢM KÍCH THƯỚC ICON
+                child: Icon(Icons.room_service, color: Color(0xFFC44536), size: 20),
               ),
-              SizedBox(width: 12), // GIẢM KHOẢNG CÁCH
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -612,16 +615,56 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
                     Text(
                       ten,
                       style: TextStyle(
-                        fontSize: 15, // GIẢM FONT SIZE
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF2C3E50),
                       ),
                     ),
-                    SizedBox(height: 2), // GIẢM KHOẢNG CÁCH
+                    SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (donVi.isNotEmpty) ...[
+                          Text(
+                            'Đơn vị: ',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF7F8C8D),
+                            ),
+                          ),
+                          Text(
+                            donVi,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF2C3E50),
+                            ),
+                          ),
+                          SizedBox(width: 12),
+                        ],
+                        if (soLuongInt > 0) ...[
+                          Text(
+                            'SL: ',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFF7F8C8D),
+                            ),
+                          ),
+                          Text(
+                            '$soLuongInt',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF2C3E50),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    SizedBox(height: 2),
                     Text(
                       '${_formatCurrency(giaInt)}đ',
                       style: TextStyle(
-                        fontSize: 14, // GIẢM FONT SIZE
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFFC44536),
                       ),
@@ -892,7 +935,7 @@ class _CoSoDetailPageState extends State<CoSoDetailPage> {
             child: ElevatedButton.icon(
               onPressed: _showServicesBottomSheet,
               icon: Icon(Icons.room_service, size: 18),
-              label: Text('Dịch vụ', style: TextStyle(fontSize: 13)),
+              label: Text('Tiện ích', style: TextStyle(fontSize: 13)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: Color(0xFF2C3E50),

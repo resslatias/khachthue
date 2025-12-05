@@ -37,10 +37,12 @@ class _BeforPageViewState extends State<_BeforPageView> {
   late Stream<QuerySnapshot> _donDatStream;
   DateTime? _startDate;
   DateTime? _endDate;
+  String _statusFilter = 'all';
 
   @override
   void initState() {
     super.initState();
+    _startDate = DateTime.now();
     _donDatStream = _getDonDatStream();
   }
 
@@ -64,6 +66,95 @@ class _BeforPageViewState extends State<_BeforPageView> {
         .collection('don_dat')
         .orderBy('ngay_tao', descending: true)
         .snapshots();
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status) {
+      case 'da_thanh_toan':
+        return 'Đã thanh toán';
+      case 'da_huy':
+        return 'Đã hủy';
+      case 'qua_han':
+        return 'Quá hạn';
+      default:
+        return 'Tất cả';
+    }
+  }
+
+
+  bool _isOrderExpired(Map<String, dynamic> order) {
+    final trangThai = order['trang_thai'] as String? ?? '';
+    final timeup = order['timeup'] as Timestamp?;
+
+    if (trangThai == 'chua_thanh_toan' && timeup != null) {
+      final timeout = timeup.toDate();
+      return DateTime.now().isAfter(timeout);
+    }
+    return false;
+  }
+
+  void _showStatusFilterDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Lọc theo trạng thái'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<String>(
+              title: const Text('Tất cả'),
+              value: 'all',
+              groupValue: _statusFilter,
+              onChanged: (value) {
+                setState(() => _statusFilter = value!);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('Đã thanh toán'),
+              value: 'da_thanh_toan',
+              groupValue: _statusFilter,
+              onChanged: (value) {
+                setState(() => _statusFilter = value!);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('Đã hủy'),
+              value: 'da_huy',
+              groupValue: _statusFilter,
+              onChanged: (value) {
+                setState(() => _statusFilter = value!);
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('Quá hạn (Hủy tự động)'),
+              value: 'qua_han',
+              groupValue: _statusFilter,
+              onChanged: (value) {
+                setState(() => _statusFilter = value!);
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+        actions: [
+          if (_statusFilter != 'all')
+            TextButton(
+              onPressed: () {
+                setState(() => _statusFilter = 'all');
+                Navigator.pop(context);
+              },
+              child: const Text('Xóa lọc'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showDateFilterDialog(BuildContext context) {
@@ -182,21 +273,69 @@ class _BeforPageViewState extends State<_BeforPageView> {
   @override
   Widget build(BuildContext context) {
     if (widget.user == null) {
+      // Phần này đã có nút lọc trạng thái - giữ nguyên
       return Column(
         children: [
           Container(
-            margin: const EdgeInsets.only(top: 10),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            padding: const EdgeInsets.only(top: 8, left: 16, right: 16, bottom: 8),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: 6,
+                  color: Colors.black26,
+                  offset: Offset(0, 3),
+                )
+              ],
+            ),
             child: Row(
               children: [
-                Icon(Icons.history, color: Color(0xFFC44536), size: 24),
-                SizedBox(width: 8),
-                Text(
+                const Text(
                   'Lịch sử đặt sân',
                   style: TextStyle(
                     fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF2C3E50),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                const SizedBox(width: 8),
+                // Nút lọc trạng thái
+                InkWell(
+                  onTap: () => _showStatusFilterDialog(context),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.filter_alt, size: 20),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Trạng thái',
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Nút lọc ngày
+                InkWell(
+                  onTap: () => _showDateFilterDialog(context),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.calendar_today, size: 20),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Lọc ngày',
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -207,9 +346,10 @@ class _BeforPageViewState extends State<_BeforPageView> {
       );
     }
 
+    // ✅ PHẦN NÀY BỊ THIẾU NÚT LỌC TRẠNG THÁI - CẦN SỬA
     return Column(
       children: [
-        // Header với nút lọc ngày
+        // Header với nút lọc
         Container(
           padding: const EdgeInsets.only(top: 8, left: 16, right: 16, bottom: 8),
           decoration: const BoxDecoration(
@@ -224,7 +364,6 @@ class _BeforPageViewState extends State<_BeforPageView> {
           ),
           child: Row(
             children: [
-              // Tiêu đề
               const Text(
                 'Lịch sử đặt sân',
                 style: TextStyle(
@@ -233,6 +372,26 @@ class _BeforPageViewState extends State<_BeforPageView> {
                 ),
               ),
               const Spacer(),
+              // ✅ THÊM: Nút lọc trạng thái
+              InkWell(
+                onTap: () => _showStatusFilterDialog(context),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.filter_alt, size: 20),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Trạng thái',
+                        style: const TextStyle(fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               // Nút lọc ngày
               InkWell(
                 onTap: () => _showDateFilterDialog(context),
@@ -257,134 +416,176 @@ class _BeforPageViewState extends State<_BeforPageView> {
         ),
 
         // Hiển thị bộ lọc đang active
-        if (_startDate != null || _endDate != null)
+        if (_startDate != null || _endDate != null || _statusFilter != 'all')
           Container(
             padding: const EdgeInsets.all(12),
             color: Colors.grey[100],
             child: Row(
               children: [
                 const Text('Bộ lọc: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    if (_startDate != null)
-                      Chip(
-                        label: Text('Từ: ${_startDate!.day}/${_startDate!.month}/${_startDate!.year}'),
-                        onDeleted: () => setState(() => _startDate = null),
-                      ),
-                    if (_endDate != null)
-                      Chip(
-                        label: Text('Đến: ${_endDate!.day}/${_endDate!.month}/${_endDate!.year}'),
-                        onDeleted: () => setState(() => _endDate = null),
-                      ),
-                  ],
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (_startDate != null)
+                        Chip(
+                          label: Text('Từ: ${_startDate!.day}/${_startDate!.month}/${_startDate!.year}'),
+                          onDeleted: () => setState(() => _startDate = null),
+                        ),
+                      if (_endDate != null)
+                        Chip(
+                          label: Text('Đến: ${_endDate!.day}/${_endDate!.month}/${_endDate!.year}'),
+                          onDeleted: () => setState(() => _endDate = null),
+                        ),
+                      if (_statusFilter != 'all')
+                        Chip(
+                          label: Text(_getStatusLabel(_statusFilter)),
+                          onDeleted: () => setState(() => _statusFilter = 'all'),
+                        ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-
         Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: _donDatStream,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, size: 60, color: Color(0xFFE74C3C)),
-                      SizedBox(height: 16),
-                      Text(
-                        'Lỗi: ${snapshot.error}',
-                        style: TextStyle(color: Color(0xFF7F8C8D)),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                );
-              }
+          child: RefreshIndicator(
+            color: Color(0xFFC44536),
+            onRefresh: () async {
+              // ✅ THÊM: Kéo xuống để làm mới
+              setState(() {
+                _donDatStream = _getDonDatStream();
+              });
+              await Future.delayed(Duration(milliseconds: 500));
+            },
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _donDatStream,
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, size: 60, color: Color(0xFFE74C3C)),
+                        SizedBox(height: 16),
+                        Text(
+                          'Lỗi: ${snapshot.error}',
+                          style: TextStyle(color: Color(0xFF7F8C8D)),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Center(child: CircularProgressIndicator(color: Color(0xFFC44536)));
-              }
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator(color: Color(0xFFC44536)));
+                }
 
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.history, size: 60, color: Color(0xFFBDC3C7)),
-                      SizedBox(height: 16),
-                      Text(
-                        'Chưa có đơn đặt sân nào',
-                        style: TextStyle(fontSize: 16, color: Color(0xFF7F8C8D)),
-                      ),
-                    ],
-                  ),
-                );
-              }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history, size: 60, color: Color(0xFFBDC3C7)),
+                        SizedBox(height: 16),
+                        Text(
+                          'Chưa có đơn đặt sân nào',
+                          style: TextStyle(fontSize: 16, color: Color(0xFF7F8C8D)),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-              var orders = snapshot.data!.docs;
+                var orders = snapshot.data!.docs;
 
-              // Lọc theo khoảng ngày
-              if (_startDate != null || _endDate != null) {
-                orders = orders.where((doc) {
-                  final order = doc.data() as Map<String, dynamic>;
-                  final ngayDatStr = order['ngay_dat'] as String?;
-                  if (ngayDatStr == null) return false;
+                // Lọc theo khoảng ngày
+                if (_startDate != null || _endDate != null) {
+                  orders = orders.where((doc) {
+                    final order = doc.data() as Map<String, dynamic>;
+                    final ngayDatStr = order['ngay_dat'] as String?;
+                    if (ngayDatStr == null) return false;
 
-                  try {
-                    final parts = ngayDatStr.split('_');
-                    final ngayDat = DateTime(
-                      int.parse(parts[2]),  // năm
-                      int.parse(parts[1]),  // tháng
-                      int.parse(parts[0]),  // ngày
-                    );
+                    try {
+                      final parts = ngayDatStr.split('_');
+                      final ngayDat = DateTime(
+                        int.parse(parts[2]),  // năm
+                        int.parse(parts[1]),  // tháng
+                        int.parse(parts[0]),  // ngày
+                      );
 
-                    if (_startDate != null && ngayDat.isBefore(_startDate!)) {
+                      if (_startDate != null) {
+                        final startDateOnly = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+                        final ngayDatOnly = DateTime(ngayDat.year, ngayDat.month, ngayDat.day);
+                        if (ngayDatOnly.isBefore(startDateOnly)) {
+                          return false;
+                        }
+                      }
+                      if (_endDate != null) {
+                        final endDateOnly = DateTime(_endDate!.year, _endDate!.month, _endDate!.day);
+                        final ngayDatOnly = DateTime(ngayDat.year, ngayDat.month, ngayDat.day);
+                        if (ngayDatOnly.isAfter(endDateOnly)) {
+                          return false;
+                        }
+                      }
+                      return true;
+                    } catch (e) {
                       return false;
                     }
-                    if (_endDate != null && ngayDat.isAfter(_endDate!)) {
-                      return false;
+                  }).toList();
+                }
+
+                // ✅ THÊM: Lọc theo trạng thái
+                if (_statusFilter != 'all') {
+                  orders = orders.where((doc) {
+                    final order = doc.data() as Map<String, dynamic>;
+                    final trangThai = order['trang_thai'] as String? ?? '';
+
+                    if (_statusFilter == 'qua_han') {
+                      return _isOrderExpired(order);
+                    } else if (_statusFilter == 'da_thanh_toan') {
+                      return trangThai == 'da_thanh_toan';
+                    } else if (_statusFilter == 'da_huy') {
+                      return trangThai == 'da_huy';
                     }
                     return true;
-                  } catch (e) {
-                    return false;
-                  }
-                }).toList();
-              }
+                  }).toList();
+                }
 
-              if (orders.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search, size: 60, color: Color(0xFFBDC3C7)),
-                      SizedBox(height: 16),
-                      Text(
-                        'Không có đơn đặt sân trong khoảng ngày đã chọn',
-                        style: TextStyle(fontSize: 16, color: Color(0xFF7F8C8D)),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: orders.length,
-                itemBuilder: (context, index) {
-                  final doc = orders[index];
-                  final order = doc.data() as Map<String, dynamic>;
-
-                  return _OrderCard(
-                    order: order,
-                    onTap: () => _showOrderDetail(order),
+                if (orders.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.search, size: 60, color: Color(0xFFBDC3C7)),
+                        SizedBox(height: 16),
+                        Text(
+                          'Không có đơn đặt sân phù hợp với bộ lọc',
+                          style: TextStyle(fontSize: 16, color: Color(0xFF7F8C8D)),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
                   );
-                },
-              );
-            },
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: orders.length,
+                  itemBuilder: (context, index) {
+                    final doc = orders[index];
+                    final order = doc.data() as Map<String, dynamic>;
+
+                    return _OrderCard(
+                      order: order,
+                      onTap: () => _showOrderDetail(order),
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ),
       ],

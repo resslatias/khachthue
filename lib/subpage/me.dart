@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:khachthue/subpage/sub_in_me/CreateReportPage.dart';
 import 'package:khachthue/subpage/sub_in_me/like.dart';
 import 'package:khachthue/subpage/sub_in_me/profile.dart';
 import 'package:khachthue/subpage/sub_in_me/refund.dart';
@@ -120,6 +121,18 @@ class _MePageView extends StatelessWidget {
                           MaterialPageRoute(builder: (context) => const RefundPage()),
                         ),
                       ),
+                      _MenuDivider(),
+                      _MenuItem(
+                        icon: Icons.report_problem,
+                        title: 'Gửi đơn báo cáo',
+                        subtitle: 'Báo cáo vấn đề cần hỗ trợ',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => CreateReportPage()),
+                          );
+                        },
+                      ),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -237,6 +250,7 @@ class _MePageView extends StatelessWidget {
                       subtitle: 'Quyền riêng tư và điều khoản sử dụng',
                       onTap: () => _showComingSoon(context),
                     ),
+
                   ],
                 ),
 
