@@ -222,7 +222,7 @@ class _HomePageContentState extends State<HomePageContent> {
                     Expanded(
                       child: _buildSmallFilterField(
                         controller: _huyenController,
-                        hint: 'Phường',
+                        hint: 'Huyện',
                         value: _selectedHuyen,
                         onChanged: (v) => setState(() => _selectedHuyen = v.trim()),
                       ),
